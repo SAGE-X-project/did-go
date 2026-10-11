@@ -1,0 +1,316 @@
+# DID Core v1.0/v1.1: Sequence Diagrams
+
+> Each sequence corresponds to a use case in `01-use-cases.md`. The diagrams are written in Mermaid and render on GitHub and in compatible viewers.
+
+---
+
+## 1. Parse and validate a DID (UC-1)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as App Developer
+    participant P as did.Parse
+    participant ABNF as syntax (ABNF validator)
+
+    Dev->>P: Parse("did:example:123/path?versionId=1#key-1")
+    P->>ABNF: validate scheme "did:"
+    ABNF-->>P: ok
+    P->>ABNF: validate method-name (lowercase+digit)
+    ABNF-->>P: "example"
+    P->>ABNF: validate method-specific-id (idchar / pct-encoded)
+    ABNF-->>P: "123"
+    P->>ABNF: split & validate path / query / fragment (RFC3986)
+    alt syntax violation
+        ABNF-->>P: error(pos)
+        P-->>Dev: nil, ErrInvalidSyntax(pos)
+    else valid
+        ABNF-->>P: components
+        P-->>Dev: DIDURL{DID, Path, Query, Fragment}
+    end
+```
+
+---
+
+## 2. Build and validate a DID document (UC-2)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as App Developer
+    participant B as document.Builder
+    participant Val as document.Validator
+
+    Dev->>B: NewBuilder(did)
+    Dev->>B: AddVerificationMethod(vm)
+    B->>Val: check vm.id is DID-URL, controller is DID
+    B->>Val: check publicKeyMultibase XOR publicKeyJwk
+    alt both key formats present
+        Val-->>B: ErrKeyFormatConflict
+        B-->>Dev: error
+    else ok
+        Val-->>B: ok
+    end
+    Dev->>B: AddService(svc)
+    B->>Val: check serviceEndpoint URL validity
+    Dev->>B: AddAuthentication("#key-1")  %% by reference
+    Dev->>B: Build()
+    B->>Val: validate whole document (id required, sets unique)
+    Val-->>B: ok
+    B-->>Dev: Document (immutable)
+```
+
+---
+
+## 3. Produce a representation (UC-3)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev
+    participant Prod as representation.Producer
+    participant JSON as json encoder
+    participant LD as jsonld rules
+
+    Dev->>Prod: Produce(doc, opts{SpecVersion, JSONLD:true, IncludeSecret:false})
+    Prod->>Prod: assert doc is conforming (else refuse)
+    opt SpecVersion == V10
+        Prod->>Prod: ProfileV10 check (service.id required, warn on undefined properties, see 09 §5)
+    end
+    Prod->>Prod: drop secretKey* unless IncludeSecret
+    alt JSON-LD
+        Prod->>LD: ensure @context[0] == version URL (V11 ".../did/v1.1" / V10 ".../did/v1")
+        LD-->>Prod: @context injected
+    end
+    Prod->>JSON: encode (map→Object, set→Array, datetime→UTC "Z")
+    JSON-->>Prod: bytes
+    Prod-->>Dev: (bytes, mediaType)  %% V11: application/did / V10: did+ld+json|did+json
+```
+
+---
+
+## 4. Consume a representation (UC-4)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Verifier
+    participant Cons as representation.Consumer
+    participant JSON as json decoder
+
+    Verifier->>Cons: Consume(bytes, mediaType)  %% application/did | did+json | did+ld+json
+    Cons->>Cons: first version signal: media type (did+json/did+ld+json → V10, 09 §4 rule 1)
+    Cons->>JSON: decode root
+    alt root is not a JSON Object
+        JSON-->>Cons: not object
+        Cons-->>Verifier: ErrNonConforming
+    else
+        JSON-->>Cons: object
+        Cons->>Cons: settle version: @context[0] (…/v1→V10, …/v1.1→V11, absent→VUnknown, 09 §4 rules 2-4)
+        Cons->>Cons: map JSON types → data model (normalize into the single v1.1 superset model)
+        Cons->>Cons: known repr-specific (@context etc.) → representation-specific-entries (rule 3)
+        Cons->>Cons: unrecognized non-repr entries → data-model extension properties (rule 4)
+        opt @context present
+            Cons->>Cons: JSON-LD: drop undefined terms (against the context of the detected version)
+        end
+        Cons->>Cons: validate conformance
+        Cons-->>Verifier: Document + ConsumeInfo{DetectedVersion}
+    end
+```
+
+---
+
+## 5. Resolve a DID (UC-5)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Verifier
+    participant R as resolution.Resolver
+    participant Reg as method.Registry
+    participant M as Method(example)
+    participant VDR as Verifiable Data Registry
+    participant Cons as representation.Consumer
+
+    Verifier->>R: Resolve(did, resolutionOptions)
+    R->>R: Parse(did)  %% UC-1
+    alt invalid syntax
+        R-->>Verifier: null, meta{error.type=…#INVALID_DID}, {}
+    else
+        R->>Reg: Lookup(method-name)
+        alt not registered
+            Reg-->>R: nil
+            R-->>Verifier: null, meta{error.type=…#METHOD_NOT_SUPPORTED}, {}
+        else
+            Reg-->>R: Method
+            R->>M: Read(did, options)
+            M->>VDR: fetch state
+            VDR-->>M: raw record
+            M->>M: verify authenticity of response
+            alt not found
+                M-->>R: ErrNotFound
+                R-->>Verifier: null, meta{error.type=…#NOT_FOUND}, {}
+            else deactivated (not an error)
+                M-->>R: docMeta{deactivated:true}
+                R-->>Verifier: null, meta{}, docMeta{deactivated:true}
+            else ok
+                M-->>R: raw bytes(ReadResult.Data), docMeta{versionId,updated}
+                R->>Cons: Consume(bytes, mediaType)
+                Cons-->>R: Document + ConsumeInfo
+                R-->>Verifier: doc, resolutionMeta{contentType}, docMeta
+            end
+        end
+    end
+```
+
+---
+
+## 6. Dereference a DID URL (UC-6)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Verifier
+    participant DR as resolution.Dereferencer
+    participant R as resolution.Resolver
+    participant Sel as document.Selector
+
+    Verifier->>DR: Dereference("did:example:123#key-1", {accept, verificationRelationship})
+    DR->>DR: split DID / path / query / fragment
+    Note over DR,R: pass DID parameters (service/relativeRef/versionId…) as resolve options
+    DR->>R: Resolve("did:example:123")
+    R-->>DR: Document, meta
+    alt resolution error
+        DR-->>Verifier: dereferencingMetadata{error(RFC9457)}, null, {}
+    else fragment present
+        DR->>Sel: selectByID(doc, "did:example:123#key-1")
+        Note over Sel: absolutize relative DID URLs, then compare id. Check verificationRelationship authorization
+        alt match and authorized
+            Sel-->>DR: VerificationMethod / Service
+            DR-->>Verifier: meta{contentType}, resource, contentMeta
+        else no match
+            Sel-->>DR: nil
+            DR-->>Verifier: meta{error.type=…#NOT_FOUND}, null, {}
+        else not authorized (verificationRelationship mismatch)
+            Sel-->>DR: unauthorized
+            DR-->>Verifier: meta{error.type=CID …#INVALID_RELATIONSHIP_FOR_VERIFICATION_METHOD}, null, {}
+        end
+    else no fragment
+        DR-->>Verifier: meta{contentType:"application/did"}, wholeDoc, docMeta
+    end
+```
+
+---
+
+## 7. Create a DID (UC-7)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as DID Controller
+    participant M as Method(example)
+    participant KM as Key Manager
+    participant VDR as Verifiable Data Registry
+
+    C->>M: Create(inputDoc, options{authz})
+    M->>M: authorize (method-defined)
+    M->>KM: generate/register key pair
+    KM-->>M: publicKeyMultibase
+    M->>M: derive method-specific-id (unique within method → DID globally unique)
+    M->>M: assemble conforming DID document
+    M->>VDR: write record (integrity-protected)
+    VDR-->>M: commit (versionId, created)
+    M-->>C: did, Document, metadata
+```
+
+---
+
+## 8. Update and deactivate (UC-8 / UC-9)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as DID Controller
+    participant M as Method
+    participant Auth as Authorization
+    participant VDR as Verifiable Data Registry
+
+    rect rgb(235,245,255)
+    Note over C,VDR: Update (UC-8)
+    C->>M: Update(did, newDoc, proof)
+    M->>Auth: verify proof vs controller/capabilityInvocation
+    Auth-->>M: authorized
+    M->>VDR: apply change
+    VDR-->>M: versionId', updated
+    M-->>C: Document', metadata
+    end
+
+    rect rgb(255,240,240)
+    Note over C,VDR: Deactivate (UC-9)
+    C->>M: Deactivate(did, proof)
+    M->>Auth: verify proof
+    M->>VDR: mark deactivated
+    VDR-->>M: ok
+    M-->>C: metadata{deactivated:true}
+    end
+```
+
+---
+
+## 9. Select a verification method by purpose (UC-10)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor V as Verifier
+    participant Doc as Document
+    participant Sel as document.Selector
+
+    V->>Doc: Relationship(Authentication)
+    Doc-->>V: [ "#key-1" (ref) | VM(embedded) ]
+    loop each entry
+        alt referenced (string)
+            V->>Sel: resolveRef(doc, "#key-1")
+            Sel->>Sel: absolutize relative DID URL
+            Sel->>Doc: find verificationMethod by id
+            alt not found
+                Doc-->>V: ErrDanglingReference
+            else
+                Doc-->>V: VerificationMethod
+            end
+        else embedded (map)
+            V->>V: use inline VM
+        end
+    end
+    V->>V: parse publicKeyMultibase / publicKeyJwk → verify signature
+```
+
+---
+
+## 10. v1.0 contract: resolveRepresentation (UC-12, FR-V4)
+
+This is the `resolution/compat.V10Resolver` flow for legacy callers that need the v1.0 REC §7.1 contract. See [`09`](09-v1.0-compat.md) §6 for details.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor L as Legacy Client (v1.0)
+    participant C10 as compat.V10Resolver
+    participant R as resolution.Resolver (v1.1 core)
+    participant Prod as representation.Producer
+
+    L->>C10: resolveRepresentation(did, {accept:"application/did+ld+json"})
+    C10->>R: Resolve(did, opts)
+    R-->>C10: Result{doc, resolutionMeta, docMeta}
+    alt RFC9457 error
+        C10->>C10: map type URL → string code (…#NOT_FOUND → "notFound", 09 §6.1)
+        C10-->>L: meta{error:"notFound"}, null, {}
+    else deactivated (not an error, same in both versions)
+        C10-->>L: meta{}, null, docMeta{deactivated:true}
+    else ok
+        C10->>Prod: Produce(doc, {SpecVersion:V10, JSONLD:based on accept})
+        Prod-->>C10: bytes, "application/did+ld+json"
+        C10-->>L: meta{contentType:"application/did+ld+json"}, bytes, docMeta
+    end
+    Note over C10: the resolve() path does not set contentType (v1.0 §7.1.2 MUST NOT)
+```
