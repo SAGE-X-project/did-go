@@ -417,9 +417,9 @@ candidate approach and has not been designed.
 
 ## 9. Open decisions
 
-- License. `did-go` starts under LGPL-3.0 to match the SAGE Go core. Apache-2.0
-  would match sage-spec and rs-sage-core and is easier for wide adoption.
-  Changing it becomes hard after outside contributions arrive.
+The license was decided on 2026-10-12: Apache License 2.0, the same as
+sage-spec and rs-sage-core, so that any project can import `did-go`.
+
 - Whether `did:webvh` ships with `did:web` or waits for wider adoption.
 - Whether a general extension that reads DIDs from A2A cards is needed.
 - OPEN-1 to OPEN-5 of the sage-spec proposal. `advanced/sage` is not
