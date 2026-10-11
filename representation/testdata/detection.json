@@ -1,0 +1,17 @@
+{
+  "source": "docs/10-abnf-appendix.md §2.5 (D1 to D11), the detection rule of docs/09 §4 and docs/12 §6.1",
+  "vectors": [
+    {"id": "D1", "mediaType": "application/did+json", "context": null, "version": "1.0", "jsonld": false},
+    {"id": "D2", "mediaType": "application/did+ld+json", "context": "https://www.w3.org/ns/did/v1", "version": "1.0", "jsonld": true},
+    {"id": "D3", "mediaType": "application/did", "context": "https://www.w3.org/ns/did/v1", "errorStep": 3},
+    {"id": "D4", "mediaType": "application/did", "context": "https://www.w3.org/ns/did/v1.1", "version": "1.1", "jsonld": true},
+    {"id": "D5", "mediaType": "application/did", "context": null, "version": "1.1", "jsonld": false},
+    {"id": "D6", "mediaType": "application/did+json", "context": "https://www.w3.org/ns/did/v1.1", "version": "1.0", "jsonld": false, "unexpectedContext": "https://www.w3.org/ns/did/v1.1", "strictErrorStep": 1},
+    {"id": "D7", "mediaType": "application/did+ld+json", "context": null, "errorStep": 2},
+    {"id": "D8", "mediaType": "application/json", "context": null, "version": "unknown", "jsonld": false, "assumed": true, "lowPrecision": {"declared": "application/json", "detected": "application/did"}, "strictErrorStep": 4},
+    {"id": "D9", "mediaType": "application/ld+json", "context": "https://www.w3.org/ns/did/v1", "version": "1.0", "jsonld": true, "lowPrecision": {"declared": "application/ld+json", "detected": "application/did+ld+json"}, "strictErrorStep": 4},
+    {"id": "D10", "mediaType": "application/json", "context": "https://www.w3.org/ns/did/v1.1", "version": "1.1", "jsonld": true, "lowPrecision": {"declared": "application/json", "detected": "application/did"}, "strictErrorStep": 4},
+    {"id": "D11-text", "mediaType": "text/plain", "context": "https://www.w3.org/ns/did/v1.1", "errorStep": 5},
+    {"id": "D11-none", "mediaType": "", "context": "https://www.w3.org/ns/did/v1.1", "errorStep": 5}
+  ]
+}

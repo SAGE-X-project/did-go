@@ -1,0 +1,27 @@
+{
+  "source": "docs/10-abnf-appendix.md §2.1, §2.2",
+  "valid": [
+    {"id": "V1", "input": "did:example:123456789abcdefghi", "method": "example", "msid": "123456789abcdefghi", "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "V2", "input": "did:example:123", "method": "example", "msid": "123", "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "V3", "input": "did:0abc:xyz", "method": "0abc", "msid": "xyz", "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "V4", "input": "did:example:123:456:789", "method": "example", "msid": "123:456:789", "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "V5", "input": "did:web:w3c-ccg.github.io", "method": "web", "msid": "w3c-ccg.github.io", "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "V6", "input": "did:web:example.com%3A8080", "method": "web", "msid": "example.com%3A8080", "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "V7", "input": "did:key:z6MkmM42vxfqZQsv4ehtTjFFxQ4sQKS2w6WR7emozFAn5cxu", "method": "key", "msid": "z6MkmM42vxfqZQsv4ehtTjFFxQ4sQKS2w6WR7emozFAn5cxu", "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "V8", "input": "did:example:a-b_c.d", "method": "example", "msid": "a-b_c.d", "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "V9", "input": "DID:example:123", "method": "example", "msid": "123", "string": "did:example:123", "note": "the ABNF literal \"did:\" is case-insensitive (RFC 5234 §2.3); the scheme is written in lowercase", "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "V9-mixed", "input": "Did:example:123", "method": "example", "msid": "123", "string": "did:example:123", "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]}
+  ],
+  "invalid": [
+    {"id": "I1", "input": "did:EXAMPLE:123", "pos": 4, "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "I2", "input": "did:example:", "pos": 12, "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "I3", "input": "did:example:123:", "pos": 15, "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "I4", "input": "did::123", "pos": 4, "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "I5", "input": "did:example", "pos": 11, "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "I6", "input": "did:example:1%3", "pos": 13, "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "I7", "input": "did:example:1%GG", "pos": 13, "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "I8", "input": "did:ex ample:123", "pos": 6, "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "I9", "input": "example:123", "pos": 0, "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]},
+    {"id": "I10", "input": "did:example:123#key-1", "pos": 15, "restriction": true, "statements": ["core10#did-syntax.1", "did11-cr20260305#did-syntax.1"]}
+  ]
+}

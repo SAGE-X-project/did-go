@@ -1,0 +1,41 @@
+{
+  "source": "docs/10-abnf-appendix.md §2.6 C6 and the DID Core 1.0 service rules (docs/06 §8)",
+  "vectors": [
+    {
+      "id": "C6",
+      "service": {"type": ["A"], "serviceEndpoint": ["https://e.example/"]},
+      "note": "the endpoint of docs/10 C6 gains the trailing slash of RFC 3986 §6.2.3 so that only service.id is at stake",
+      "V10": {"severity": "error", "statement": "core10#services.3"},
+      "V11": {"severity": "warning", "statement": "cid10#services.3"},
+      "statements": ["core10#services.3", "cid10#services.3"]
+    },
+    {
+      "id": "V10-relative-service-id",
+      "service": {"id": "#agent", "type": ["A"], "serviceEndpoint": ["https://e.example/"]},
+      "V10": {"severity": "error", "statement": "core10#services.5"},
+      "V11": null,
+      "statements": ["core10#services.5"]
+    },
+    {
+      "id": "V10-urn-service-id",
+      "service": {"id": "urn:uuid:6e8bc430-9c3a-11d9-9669-0800200c9a66", "type": ["A"], "serviceEndpoint": ["https://e.example/"]},
+      "V10": null,
+      "V11": null,
+      "statements": ["core10#services.5"]
+    },
+    {
+      "id": "V10-unnormalized-endpoint",
+      "service": {"id": "did:example:123456789abcdefghi#s", "type": ["A"], "serviceEndpoint": ["HTTPS://E.example:443/a/../b"]},
+      "V10": {"severity": "error", "statement": "core10#services.11"},
+      "V11": null,
+      "statements": ["core10#services.11"]
+    },
+    {
+      "id": "V10-normalized-endpoint",
+      "service": {"id": "did:example:123456789abcdefghi#s", "type": ["A"], "serviceEndpoint": ["https://e.example/b", {"origins": ["https://x.example"]}]},
+      "V10": null,
+      "V11": null,
+      "statements": ["core10#services.11"]
+    }
+  ]
+}
