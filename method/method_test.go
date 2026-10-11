@@ -92,3 +92,18 @@ func TestErrors(t *testing.T) {
 		t.Fatal("Produces")
 	}
 }
+
+func TestErrorClassesAreDistinct(t *testing.T) {
+	all := []Error{ErrNotSupported, ErrNotFound, ErrUnauthorized, ErrInvalidInput, ErrInvalidDocument}
+	for i, a := range all {
+		for j, b := range all {
+			if (i == j) != errors.Is(a, b) {
+				t.Errorf("errors.Is(%q, %q) = %v", a, b, i != j)
+			}
+		}
+	}
+	wrapped := fmt.Errorf("document id differs: %w", ErrInvalidDocument)
+	if !errors.Is(wrapped, ErrInvalidDocument) || errors.Is(wrapped, ErrInvalidInput) || ErrInvalidDocument.Error() == "" {
+		t.Fatal("ErrInvalidDocument is its own class")
+	}
+}

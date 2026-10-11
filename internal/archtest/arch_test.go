@@ -6,6 +6,7 @@ import (
 	"go/build"
 	"io/fs"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -53,6 +54,20 @@ var layers = map[string]layer{
 	"internal/archtest":     layerMeta,
 	"internal/testutil":     layerMeta,
 	"internal/roundtrip":    layerMeta,
+}
+
+// notWired are the players didkit must not import (docs/14 §6): drivers,
+// which the caller passes as method.Method values so that a did:key user
+// does not link net/http, the DID Core 1.0 adapter, which legacy callers wrap
+// themselves, and the HTTPS binding, which is a transport.
+func notWired() []string {
+	return []string{"method/key", "method/web", "resolution/compat", "resolution/universal"}
+}
+
+// wires reports whether a package of layer from may import target by the
+// didkit rule of docs/14 §6, on top of the layer rule.
+func wires(from layer, target string) bool {
+	return from != layerWiring || !slices.Contains(notWired(), target)
 }
 
 // allowed reports whether a package of layer from may import a package of
@@ -145,6 +160,9 @@ func TestImportRules(t *testing.T) {
 			if !allowed(from, to) {
 				t.Errorf("%s (layer %d) must not import %s (layer %d)", rel, from, target, to)
 			}
+			if !wires(from, target) {
+				t.Errorf("%s must not import %s; didkit takes drivers from the caller (docs/14 §6)", rel, target)
+			}
 		}
 	}
 }
@@ -158,5 +176,21 @@ func TestRulesRejectPlayerToPlayer(t *testing.T) {
 	}
 	if !allowed(layerWiring, layerPlayer) {
 		t.Fatal("didkit must be able to wire players")
+	}
+}
+
+func TestRulesKeepDriversOutOfDidkit(t *testing.T) {
+	for _, target := range notWired() {
+		if wires(layerWiring, target) {
+			t.Errorf("didkit must not import %s", target)
+		}
+		if !wires(layerMeta, target) || !wires(layerPlayer, target) {
+			t.Errorf("the didkit rule applies only to the wiring layer (%s)", target)
+		}
+	}
+	for _, target := range []string{"resolver", "dereferencer", "resolution/cache", "producer", "consumer", "method"} {
+		if !wires(layerWiring, target) {
+			t.Errorf("didkit must be able to import %s", target)
+		}
 	}
 }

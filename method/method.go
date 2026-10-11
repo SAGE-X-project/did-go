@@ -30,7 +30,15 @@ const (
 	// ErrUnauthorized: the proof of authorization was missing or invalid.
 	ErrUnauthorized Error = "method: authorization failed"
 	// ErrInvalidInput: a DID or document the operation cannot accept.
+	// Resolvers report INVALID_DID.
 	ErrInvalidInput Error = "method: invalid input"
+	// ErrInvalidDocument: the driver obtained a DID document from the
+	// verifiable data registry that does not conform, or whose id is not the
+	// DID being resolved (res10-crd20261001#resolving.7: "The value of id in
+	// the resolved DID document MUST be string equal to the DID that was
+	// resolved"). The DID itself was acceptable. Resolvers report
+	// INVALID_DID_DOCUMENT.
+	ErrInvalidDocument Error = "method: invalid DID document"
 )
 
 // Signer signs on behalf of a DID controller. The library never holds the

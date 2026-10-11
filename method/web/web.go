@@ -161,10 +161,12 @@ func (m *Method) Deactivate(context.Context, did.DID, method.DeactivateOptions) 
 // DocumentFile writes doc as the content of its did.json file with the
 // producer given to New and checks it as Read would: the document id must be
 // a did:web DID that forms a URL, and every DID URL in it must be absolute.
-// It returns the bytes and their media type.
+// It returns the bytes and their media type. The document is the caller's
+// input, so a document that fails these checks is method.ErrInvalidInput as
+// well as a CodeInvalidDidDocument *Error.
 func (m *Method) DocumentFile(doc *document.Document, opts representation.ProduceOptions) ([]byte, string, error) {
 	if doc == nil {
-		return nil, "", raise(CodeInvalidDidDocument, stmtVerifyID, "no document")
+		return nil, "", invalidInput(raise(CodeInvalidDidDocument, stmtVerifyID, "no document"))
 	}
 	if _, err := URL(doc.ID()); err != nil {
 		return nil, "", err
@@ -177,7 +179,12 @@ func (m *Method) DocumentFile(doc *document.Document, opts representation.Produc
 		return nil, "", fmt.Errorf("web: produce %s: %w", doc.ID(), err)
 	}
 	if err := checkDocument(data, doc.ID()); err != nil {
-		return nil, "", err
+		return nil, "", invalidInput(err)
 	}
 	return data, mediaType, nil
+}
+
+// invalidInput marks err as a fault of the caller's input.
+func invalidInput(err error) error {
+	return fmt.Errorf("%w: %w", method.ErrInvalidInput, err)
 }

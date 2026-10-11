@@ -20,7 +20,9 @@ const (
 	CodeNotFound = "notFound"
 	// CodeInvalidDidDocument: the fetched bytes are not a JSON object whose
 	// id is the resolved DID, or they contain a relative DID URL. It unwraps
-	// to method.ErrInvalidInput.
+	// to method.ErrInvalidDocument, which a resolver reports as
+	// INVALID_DID_DOCUMENT: the DID was acceptable, the document the web
+	// server returned is not.
 	CodeInvalidDidDocument = "invalidDidDocument"
 	// CodeFetchFailed: the HTTPS request failed, was refused by a security
 	// rule of the driver, or exceeded a limit. It unwraps to the cause only,
@@ -29,8 +31,8 @@ const (
 )
 
 // Error is an error the did:web driver returns. Unwrap yields the method
-// error class of the code (method.ErrInvalidInput, method.ErrNotFound) and
-// the underlying cause, so errors.Is works with both.
+// error class of the code (method.ErrInvalidInput, method.ErrInvalidDocument,
+// method.ErrNotFound) and the underlying cause, so errors.Is works with both.
 type Error struct {
 	// Code is one of the Code constants.
 	Code string
@@ -56,8 +58,10 @@ func (e *Error) Error() string {
 func (e *Error) Unwrap() []error {
 	var out []error
 	switch e.Code {
-	case CodeInvalidDid, CodeInvalidURL, CodeInvalidDidDocument:
+	case CodeInvalidDid, CodeInvalidURL:
 		out = append(out, method.ErrInvalidInput)
+	case CodeInvalidDidDocument:
+		out = append(out, method.ErrInvalidDocument)
 	case CodeNotFound:
 		out = append(out, method.ErrNotFound)
 	}
