@@ -2,8 +2,9 @@
 """Build conformance/requirements.json from extracted statements and review decisions.
 
 Inputs:
-  STATEMENTS_DIR  {core10,did11,cid10,res10,didkey}.json from extract_spec.py
-                  (didkey.json is extracted with --respec)
+  STATEMENTS_DIR  {core10,did11,cid10,res10,didkey,didweb}.json from
+                  extract_spec.py (didkey.json and didweb.json are extracted
+                  with --respec)
   COVERAGE_JSON   one or more coverage verdict files ({"id","decision","reason"})
   LINKED_JSON     a JSON list of statement ids that the design restates (from compare.py)
 
@@ -24,6 +25,7 @@ KEYS = {
     "cid10": "cid10",
     "res10": "res10-crd20261001",
     "didkey": "didkey-2cc490c",
+    "didweb": "didweb-ea423c1",
 }
 
 SPEC_AUTHOR = {"method-syntax", "method-operations", "security-requirements",
@@ -80,6 +82,14 @@ OWNERS = {
     "encryption-method-creation-algorithm": ["method/key"],
     "derive-encryption-key-algorithm": ["method/key"],
     "context-creation-algorithm": ["method/key"],
+    # did:web (didweb-ea423c1): the driver checks the DID syntax the method
+    # defines, turns a DID into its HTTPS URL, fetches it and checks the
+    # document id. Building a DID from a URL (create-register) is offered by
+    # the driver as a helper for controllers.
+    "method-name": ["method/web"],
+    "method-specific-identifier": ["method/web"],
+    "create-register": ["method/web"],
+    "read-resolve": ["method/web"],
 }
 
 
@@ -177,6 +187,10 @@ SPEC_AUTHOR_IDS = {
 OUT_OF_SCOPE_IDS = {
     "didkey#signature-method-creation-algorithm.5":
         "informative: explains how the previous sentence is usually met and states no requirement",
+    "didweb#read-resolve.9":
+        "deployment: DNS resolution is performed by the dialer of the *http.Client the caller "
+        "injects; did-go ships no DNS-over-HTTPS resolver and documents that the caller "
+        "configures one (method/web package documentation)",
 }
 
 
