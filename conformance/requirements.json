@@ -4157,7 +4157,8 @@
    "scope": "in-scope",
    "reason": "",
    "owners": [
-    "resolver"
+    "resolver",
+    "relyingparty"
    ]
   },
   {
@@ -4588,7 +4589,8 @@
    "scope": "in-scope",
    "reason": "",
    "owners": [
-    "vm"
+    "vm",
+    "relyingparty"
    ]
   },
   {
@@ -4618,7 +4620,8 @@
    "scope": "in-scope",
    "reason": "",
    "owners": [
-    "vm"
+    "vm",
+    "relyingparty"
    ]
   },
   {
