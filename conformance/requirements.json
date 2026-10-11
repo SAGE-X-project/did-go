@@ -10694,6 +10694,1144 @@
    "scope": "out-of-scope",
    "reason": "spec-author",
    "owners": []
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.1",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "The options.enableExperimentalPublicKeyTypes value SHOULD be set to `false`.",
+   "textSHA256": "04ac34d1a3cc26d500301fe26ba2782499f771ec3f65790b6105b7c444876869",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.2",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "The options.defaultContext value SHOULD be set to an array where the first element is the string value `https://www.w3.org/ns/did/v1`.",
+   "textSHA256": "67899990043c641f7db16e392186d2f2804ab2b2012be4ac5688ec6eda55c217",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.3",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "Initialize document to an empty object.",
+   "textSHA256": "9b78065335f09ea9d89c40c9327f8e4c94fef49e2e8ff7c2b2580b768428e540",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.4",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "Using a colon (`:`) as the delimiter, split the identifier into its components: a scheme, a method, a version, and a multibaseValue.",
+   "textSHA256": "5ba2d4524ffb4ddeef4cd0f49893747cdbbd7bd4bf78017fd38867b940be8073",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.5",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "If there are only three components set the version to the string value `1` and use the last value as the multibaseValue.",
+   "textSHA256": "1749e360735bf8e29d5e5b41c2f51f77b02945ac9873b65b3b559bad1e349e19",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.6",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "Check the validity of the input identifier.",
+   "textSHA256": "63d1d661c2ace6b39018542c078788e6e65669ea7c3d92c1d724907211c5f44d",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.7",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "The scheme MUST be the value `did`.",
+   "textSHA256": "6fb34bbcb0d606616767d0f2d6290f993a9c8bc556e4c9bf6e5b1f3da68f8403",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.8",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "The method MUST be the value `key`.",
+   "textSHA256": "4665fc2629c98cd387fb4aa82351f929413c2b11f3dd7b0b8aea448e3189532f",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.9",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "The version MUST be convertible to a positive integer value.",
+   "textSHA256": "f9c940974ae7d4f1c321e8f11aece89792cf3c5637a448866f58702b89b61fee",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.10",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "The multibaseValue MUST be a string and begin with the letter `z`.",
+   "textSHA256": "e1632adc11f197e753dda9903336df4fa58fd8b589154feab75a85fe76649ea9",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.11",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "If any of these requirements fail, an `invalidDid` error MUST be raised.",
+   "textSHA256": "275d5dda6bce00032fb1a59c491e04be992ef093465e3cd51fb6fbcdab901842",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.12",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "Initialize the signatureVerificationMethod to the result of passing identifier, multibaseValue, and options to Signature Method Creation Algorithm.",
+   "textSHA256": "789368ff059400e386abbe4fc05fdcaa8dd62b368e27308eb23b155a07b0fa15",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.13",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "Set document.id to identifier.",
+   "textSHA256": "b79afdad61df5cd46870a0ac381033ccc0bfd8943e60c935ac60f1c42fd1caf9",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.14",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "If document.id is not a valid DID, an `invalidDid` error MUST be raised.",
+   "textSHA256": "75ded839931f2b0d49ff78dd5abdb40aa6a7e36488334697de4ab7a6f3506b83",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.15",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "Initialize the `verificationMethod` property in document to an array where the first value is the signatureVerificationMethod.",
+   "textSHA256": "c4f7e360578d24a24c36d12846d7caedce63977cc83722952db837028fbf298b",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.16",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "Initialize the `authentication`, `assertionMethod`, `capabilityInvocation`, and the `capabilityDelegation` properties in document to an array where the first item is the value of the `id` property in signatureVerificationMethod.",
+   "textSHA256": "5184f90924c9738736caae9a694e15f0ea39969788c420ed79143e76d71bf6a3",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.17",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "If options.enableEncryptionKeyDerivation is set to `true`:",
+   "textSHA256": "2f88d0c82b7c1b233989cb09f2bbdaac0eb6fabb1074fbd086561e8391699679",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.18",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "Initialize the encryptionVerificationMethod to the result of passing identifier, multibaseValue, and options to Encryption Method Creation Algorithm.",
+   "textSHA256": "311ffb12c8391fd3bbfb5498eab561f2181b53e8d6b71c0b89ee5a8ead8a54ae",
+   "algorithmStep": true,
+   "parent": "didkey-2cc490c#document-creation-algorithm.17",
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.19",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "Add the encryptionVerificationMethod value to the `verificationMethod` array.",
+   "textSHA256": "ffeac08d48197a66dc807c3b5ef0f0e6fb3e7b087cc7a5a282174d196635f425",
+   "algorithmStep": true,
+   "parent": "didkey-2cc490c#document-creation-algorithm.17",
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.20",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "Initialize the `keyAgreement` property in document to an array where the first item is the value of the `id` property in encryptionVerificationMethod.",
+   "textSHA256": "8a056ac0eb80b0d6d7e406383f796a86bcb68ff60b9127cff6d03e76f236d60e",
+   "algorithmStep": true,
+   "parent": "didkey-2cc490c#document-creation-algorithm.17",
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.21",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "Initialize the `@context` property in document to the result of passing document and options to the Context Creation Algorithm.",
+   "textSHA256": "324f78e16e7b0e657782e99629f57b325e41164d6740679f5811c0d88fd70f1d",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#document-creation-algorithm.22",
+   "spec": "didkey-2cc490c",
+   "section": "document-creation-algorithm",
+   "term": "",
+   "text": "Return document.",
+   "textSHA256": "fee55f4849849e4a701de8a679ef5c8e065ea7f41efdf9d903339b1163f242d9",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.1",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "Initialize verificationMethod to an empty object.",
+   "textSHA256": "78507c01237c651adda5c6608908a729718a0e52e41fb3c427062261dd3bd844",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.2",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "Set multicodecValue and rawPublicKeyBytes to the result of passing multibaseValue and options to Decode Public Key Algorithm.",
+   "textSHA256": "19a2b2a0705bc8054bd0c4e20a58e421361eeb04efb416328e84a7da61a6680e",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.3",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "Ensure the proper key length of rawPublicKeyBytes based on the multicodecValue table provided below: If the byte length of rawPublicKeyBytes does not match the expected public key length for the associated multicodecValue, an `invalidPublicKeyLength` error MUST be raised.",
+   "textSHA256": "acc33406b4bf93a21b58e4fe0f04060bdf95bd0c0bb178e552db1bb5806db68e",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.4",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "Ensure the rawPublicKeyBytes are a proper encoding of the public key type as specified by the multicodecValue.",
+   "textSHA256": "8dc7082a96823c064da13d87500b52c4a405b3fc726980a715eead9a1aca18d5",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.5",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "This validation is often done by a cryptographic library when importing the public key by, for example, ensuring that an Elliptic Curve public key is a specific coordinate that exists on the elliptic curve.",
+   "textSHA256": "e4da4397f2a93399c6790abf1277d8d191a96ca1ce933fc66b5413f10b2f6dee",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "out-of-scope",
+   "reason": "informative: explains how the previous sentence is usually met and states no requirement",
+   "owners": []
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.6",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "If an invalid public key value is detected, an `invalidPublicKey` error MUST be raised.",
+   "textSHA256": "900d482849ea435951e3f5c99e8293df271f5812f112f858bdfc32e741175428",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.7",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "Set the verificationMethod.id value by concatenating identifier, a hash character (`#`), and the multicodecValue.",
+   "textSHA256": "cdb7da4d8598adfc00f5658c7dd75d8a456752493e30a0a9b49260e8bb54e0a0",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.8",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "If verificationMethod.id is not a valid DID URL, an `invalidDidUrl` error MUST be raised.",
+   "textSHA256": "c089f58dc66789f1a9a51dfe0b025de82dea3f50d29df45736540591d8b8b02a",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.9",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "Set the publicKeyFormat value to the options.publicKeyFormat value.",
+   "textSHA256": "8aaa0e5dd9ac612dadd891348ae5c91f5344eb72e4ff56f1c2411d680cd8a741",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.10",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "If publicKeyFormat is not known to the implementation, an `unsupportedPublicKeyType` error MUST be raised.",
+   "textSHA256": "1a4ee782ad416f7109f246e6308f9d36b9251f2082c47bc015adf2f83b94a001",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.11",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "If options.enableExperimentalPublicKeyTypes is set to `false` and publicKeyFormat is not `Multikey`, `JsonWebKey`, or `Ed25519VerificationKey2020`, an `invalidPublicKeyType` error MUST be raised.",
+   "textSHA256": "cceeda57bceec641f21b9678ffbcf096a95717af83417d5e58ad3b8234e8fb14",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.12",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "Set verificationMethod.type to the publicKeyFormat value.",
+   "textSHA256": "d121118953c3c58966321db5bc9f43c7ffd63d9536fe365e61f27a03ddd126d8",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.13",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "Set verificationMethod.controller to the identifier value.",
+   "textSHA256": "b918eac1f928c29a47271a67e86a3242ed8001594d815c22a63cd31196dcd306",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.14",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "If verificationMethod.controller is not a valid DID, an `invalidDid` error MUST be raised.",
+   "textSHA256": "90f3a920fbb3aa1d1825b99ebdb915993dec94f9e7621e1e869eba97df6d3083",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.15",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "If publicKeyFormat is `Multikey` or `Ed25519VerificationKey2020`, set the verificationMethod.publicKeyMultibase value to multibaseValue.",
+   "textSHA256": "d96e74218407c1d0589db583b6ef5036c8974edfbb0f6436ac313f078efcab19",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.16",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "If publicKeyFormat is `JsonWebKey`, set the verificationMethod.publicKeyJwk value to the result of passing multicodecValue and rawPublicKeyBytes to Encode JWK Algorithm.",
+   "textSHA256": "1e44147d6eac8048c2fd29d21b5c4bd05c5e743f285a2caf01e95228621011ab",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#signature-method-creation-algorithm.17",
+   "spec": "didkey-2cc490c",
+   "section": "signature-method-creation-algorithm",
+   "term": "",
+   "text": "Return verificationMethod.",
+   "textSHA256": "895d7af5c4d26eab3f0f9e6886863596ca0a2dfb3524a3ed2329be0e3d0b4ca7",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#decode-public-key-algorithm.1",
+   "spec": "didkey-2cc490c",
+   "section": "decode-public-key-algorithm",
+   "term": "",
+   "text": "Set decodedPublicKey to an empty object.",
+   "textSHA256": "b58ffbd117aeadd868905c208d193728e06bb7a3e07952cf742d5079b22c133d",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#decode-public-key-algorithm.2",
+   "spec": "didkey-2cc490c",
+   "section": "decode-public-key-algorithm",
+   "term": "",
+   "text": "Decode multibaseValue using the base58-btc multibase alphabet and set multicodecValue to the multicodec header for the decoded value.",
+   "textSHA256": "a48b2fe7b13b59dd73d8481fd614dddb13beafb9c4194339033b9e5bcee5bade",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#decode-public-key-algorithm.3",
+   "spec": "didkey-2cc490c",
+   "section": "decode-public-key-algorithm",
+   "term": "",
+   "text": "Implementers are cautioned to ensure that the multicodecValue is set to the result after performing varint decoding.",
+   "textSHA256": "057db83270d50e72a9de2cf306f667fe6bebe596f458fc50a38a79085006a274",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#decode-public-key-algorithm.4",
+   "spec": "didkey-2cc490c",
+   "section": "decode-public-key-algorithm",
+   "term": "",
+   "text": "Set the rawPublicKeyBytes to the bytes remaining after the multicodec header.",
+   "textSHA256": "06bd5bc4ae67604f87ae7dbeea584ece6246108db8bfc68a7caf102caf924565",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#decode-public-key-algorithm.5",
+   "spec": "didkey-2cc490c",
+   "section": "decode-public-key-algorithm",
+   "term": "",
+   "text": "Return multicodecValue and rawPublicKeyBytes as the decodedPublicKey.",
+   "textSHA256": "c363a261869bb2e3855d9d43f4adadef225d61d9a43260a4a32550f97ca15c98",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encode-jwk-algorithm.1",
+   "spec": "didkey-2cc490c",
+   "section": "encode-jwk-algorithm",
+   "term": "",
+   "text": "Implementations MUST conform to the normative requirements of the RFCs and specifications above.",
+   "textSHA256": "aec0c94593ddad0e43bea1cdea039b9b34b9fa4da7ecf89ed0bce4395e4644f9",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "crypto"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encode-jwk-algorithm.2",
+   "spec": "didkey-2cc490c",
+   "section": "encode-jwk-algorithm",
+   "term": "",
+   "text": "Obtain the associated `kty`, `crv`, `n`,`e` values for the JWK representation of the key type identified by multicodecValue.",
+   "textSHA256": "60bff3b44060547a1855bee5e71b2781cf9f859f57beee20e17d9be2ed425138",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "crypto"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encode-jwk-algorithm.3",
+   "spec": "didkey-2cc490c",
+   "section": "encode-jwk-algorithm",
+   "term": "",
+   "text": "If `y` is required member of the public key, perform elliptic curve expansion by applying decompression algorithm specified here. to obtain `y` and `x`.",
+   "textSHA256": "ca6883ae4def40609d10cf0107f5a6ae69ab4f6aa92f916fad0328cce0df7e9f",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "crypto"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encode-jwk-algorithm.4",
+   "spec": "didkey-2cc490c",
+   "section": "encode-jwk-algorithm",
+   "term": "",
+   "text": "Otherwise simply encode `x` according to the associated RFCs.",
+   "textSHA256": "300e8e0027873ab43a935b6f6fae89bd851ef23f2e6d66e2f97c27c8acaa888a",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "crypto"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encode-jwk-algorithm.5",
+   "spec": "didkey-2cc490c",
+   "section": "encode-jwk-algorithm",
+   "term": "",
+   "text": "Encode the final JWK object by including the members required for the given key type identified by multicodecValue, according to the requirements defined by the relevant RFC.",
+   "textSHA256": "b67ce50ad9fb4de8fc020c462a1ef7311764c54028b54928d7add569ffe85950",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "crypto"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encode-jwk-algorithm.6",
+   "spec": "didkey-2cc490c",
+   "section": "encode-jwk-algorithm",
+   "term": "",
+   "text": "Ensure that `d` is NOT present.",
+   "textSHA256": "262038fbea8aeb9685cfed73d9932f1ad23d0e82d2c3948e4448ce0a741943ce",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "crypto"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.1",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "Initialize verificationMethod to an empty object.",
+   "textSHA256": "78507c01237c651adda5c6608908a729718a0e52e41fb3c427062261dd3bd844",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.2",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "Set multicodecValue and rawPublicKeyBytes to the result of passing multibaseValue and options to Derive Encryption Key Algorithm.",
+   "textSHA256": "c17efb717c439d2881e70472c3443b57184c3d3bac45cfd76c52a3e5d48e3ee5",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.3",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "Ensure the proper key length of rawPublicKeyBytes based on the multicodecValue table provided below: If the byte length of rawPublicKeyBytes does not match the expected public key length for the associated multicodecValue, an `invalidPublicKeyLength` error MUST be raised.",
+   "textSHA256": "acc33406b4bf93a21b58e4fe0f04060bdf95bd0c0bb178e552db1bb5806db68e",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.4",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "Create the multibaseValue by concatenating the letter 'z' and the base58-btc encoding of the concatenation of the multicodecValue and the rawPublicKeyBytes.",
+   "textSHA256": "ee6a7c6dfaf78053d70fd7fe30ff55f029f293d2db53d1f0c047f31c94a9de3e",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.5",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "Set the verificationMethod.id value by concatenating identifier, a hash character (`#`), and the multibaseValue.",
+   "textSHA256": "cf16a907c6079b43795e91e53604caea3fbb739f41d024e950377c5320356ced",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.6",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "If verificationMethod.id is not a valid DID URL, an `invalidDidUrl` error MUST be raised.",
+   "textSHA256": "c089f58dc66789f1a9a51dfe0b025de82dea3f50d29df45736540591d8b8b02a",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.7",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "Set the publicKeyFormat value to the options.publicKeyFormat value.",
+   "textSHA256": "8aaa0e5dd9ac612dadd891348ae5c91f5344eb72e4ff56f1c2411d680cd8a741",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.8",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "If publicKeyFormat is not known to the implementation, an `unsupportedPublicKeyType` error MUST be raised.",
+   "textSHA256": "1a4ee782ad416f7109f246e6308f9d36b9251f2082c47bc015adf2f83b94a001",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.9",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "If options.enableExperimentalPublicKeyTypes is set to `false` and publicKeyFormat is not `Multikey`, `JsonWebKey`, or `X25519KeyAgreementKey2020`, an `invalidPublicKeyType` error MUST be raised.",
+   "textSHA256": "032228e715c059bca69c235cdecc2d8f809a64b600e3b82c2fe8639f56997fa6",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.10",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "Set verificationMethod.type to the publicKeyFormat value.",
+   "textSHA256": "d121118953c3c58966321db5bc9f43c7ffd63d9536fe365e61f27a03ddd126d8",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.11",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "Set verificationMethod.controller to identifier.",
+   "textSHA256": "3f3fc0285a62d76f212691466575c63eb46a2553f1ec4ab244af8ce8147ddc7c",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.12",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "If verificationMethod.controller is not a valid DID, an `invalidDid` error MUST be raised.",
+   "textSHA256": "90f3a920fbb3aa1d1825b99ebdb915993dec94f9e7621e1e869eba97df6d3083",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.13",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "If publicKeyFormat is `Multikey` or `X25519KeyAgreementKey2020`, set the verificationMethod.publicKeyMultibase value to multibaseValue.",
+   "textSHA256": "8e21aa4df141c0cc789f0a279051fc9a47ab2e273ad45b6c7690cb19f81c2239",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.14",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "If publicKeyFormat is `JsonWebKey`, set the verificationMethod.publicKeyJwk value to the result of passing multicodecValue and rawPublicKeyBytes to Encode JWK Algorithm.",
+   "textSHA256": "1e44147d6eac8048c2fd29d21b5c4bd05c5e743f285a2caf01e95228621011ab",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#encryption-method-creation-algorithm.15",
+   "spec": "didkey-2cc490c",
+   "section": "encryption-method-creation-algorithm",
+   "term": "",
+   "text": "Return verificationMethod.",
+   "textSHA256": "895d7af5c4d26eab3f0f9e6886863596ca0a2dfb3524a3ed2329be0e3d0b4ca7",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#derive-encryption-key-algorithm.1",
+   "spec": "didkey-2cc490c",
+   "section": "derive-encryption-key-algorithm",
+   "term": "",
+   "text": "Set publicEncryptionKey to an empty object.",
+   "textSHA256": "7a049e501da19ac1bc142448779a3cb797e857bef91518d7c92d8564dc14fd2d",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#derive-encryption-key-algorithm.2",
+   "spec": "didkey-2cc490c",
+   "section": "derive-encryption-key-algorithm",
+   "term": "",
+   "text": "Decode multibaseValue using the base58-btc multibase alphabet and set multicodecValue to the multicodec header for the decoded value.",
+   "textSHA256": "a48b2fe7b13b59dd73d8481fd614dddb13beafb9c4194339033b9e5bcee5bade",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#derive-encryption-key-algorithm.3",
+   "spec": "didkey-2cc490c",
+   "section": "derive-encryption-key-algorithm",
+   "term": "",
+   "text": "Implementers are cautioned to ensure that the multicodecValue is set to the result after performing varint decoding.",
+   "textSHA256": "057db83270d50e72a9de2cf306f667fe6bebe596f458fc50a38a79085006a274",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#derive-encryption-key-algorithm.4",
+   "spec": "didkey-2cc490c",
+   "section": "derive-encryption-key-algorithm",
+   "term": "",
+   "text": "Set the rawPublicKeyBytes to the bytes remaining after the multicodec header.",
+   "textSHA256": "06bd5bc4ae67604f87ae7dbeea584ece6246108db8bfc68a7caf102caf924565",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#derive-encryption-key-algorithm.5",
+   "spec": "didkey-2cc490c",
+   "section": "derive-encryption-key-algorithm",
+   "term": "",
+   "text": "If the multicodecValue is `0xed`, derive a public X25519 encryption key by using the rawPublicKeyBytes and the algorithm defined in [[OSCORE]] for Curve25519 in Section 2.4.2: ECDH with Montgomery Coordinates and set generatedPublicEncryptionKeyBytes to the result.",
+   "textSHA256": "7816bc7a2338b1561f92114c2c0efec22bb981ca0f48362e536d58da836533a5",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "crypto"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#derive-encryption-key-algorithm.6",
+   "spec": "didkey-2cc490c",
+   "section": "derive-encryption-key-algorithm",
+   "term": "",
+   "text": "Set multicodecValue in publicEncryptionKey to `0xec`.",
+   "textSHA256": "fad888892eb02c0dd11c6095c8dd4e2eae67b9a5bb61a7e2c9544025294ee564",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#derive-encryption-key-algorithm.7",
+   "spec": "didkey-2cc490c",
+   "section": "derive-encryption-key-algorithm",
+   "term": "",
+   "text": "Set rawPublicKeyBytes in publicEncryptionKey to generatedPublicEncryptionKeyBytes.",
+   "textSHA256": "b7898390290c7b8547800d84f691cb44d907dffe50e72751dbf82e3807da344f",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#derive-encryption-key-algorithm.8",
+   "spec": "didkey-2cc490c",
+   "section": "derive-encryption-key-algorithm",
+   "term": "",
+   "text": "Return publicEncryptionKey.",
+   "textSHA256": "081ec836695f0e1609fe24a5616e1dd1446518023fa622475883034642be1dd7",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#context-creation-algorithm.1",
+   "spec": "didkey-2cc490c",
+   "section": "context-creation-algorithm",
+   "term": "",
+   "text": "Set contextArray to an array that is initialized to options.defaultContext.",
+   "textSHA256": "94d653ad91e46afdf90bf18af63f115a7f30075f8fbc6269768490b3c5473136",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#context-creation-algorithm.2",
+   "spec": "didkey-2cc490c",
+   "section": "context-creation-algorithm",
+   "term": "",
+   "text": "For every object in every verification relationship listed in document, add a string value to the contextArray based on the object `type` value, if it doesn't already exist, according to the following table:",
+   "textSHA256": "c300f964c102c96900d8657c67e081d56d449c6ab2735b265dfcd73b28315cca",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
+  },
+  {
+   "id": "didkey-2cc490c#context-creation-algorithm.3",
+   "spec": "didkey-2cc490c",
+   "section": "context-creation-algorithm",
+   "term": "",
+   "text": "Return contextArray.",
+   "textSHA256": "8816934534a578978735766a6b68221367858c4f2c8399929ef622d97f34091f",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/key"
+   ]
   }
  ]
 }
