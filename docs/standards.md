@@ -20,6 +20,15 @@ handling: an error type outside the HTTPS binding table now gets an
 implementation-chosen status instead of 500, and a specification may declare
 that its error type refines a core error type (see 07).
 
+W3C Credentials Community Group method specifications, pinned by repository
+commit (they have no dated publications); the SHA-256 is of `index.html` at
+that commit:
+
+| Document | Status | Commit date | Pinned revision | SHA-256 |
+|---|---|---:|---|---|
+| did:key | CG draft | 2025-11-02 | https://github.com/w3c-ccg/did-key-spec/blob/2cc490c38c5aacf58497a87fc0cf8794668bf716/index.html | `e014a146acb0dcdafbdfee01226061d778da3ee72e8a048a7d53754c79675764` |
+| did:web | CG draft | 2026-05-08 | https://github.com/w3c-ccg/did-method-web/blob/ea423c114e6f2537498ee6f94e8d794c64f60c18/index.html | `7e48b1ad2d658452bc9ce23b975d243abe095f7696c06671fc332705a1290610` |
+
 Other references: RFC 3986, RFC 5234, RFC 7515, RFC 8785, RFC 9457 and RFC 9864.
 
 The copyright and terms of use of each W3C document follow the

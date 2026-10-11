@@ -53,6 +53,8 @@ The two layers follow these rules.
 
 ## 3. Repository and module layout
 
+> The implementation package layout (players, shared types, layers) is defined by [`14`](14-implementation-architecture.md), which supersedes this section where they differ.
+
 The package layout of 05 §1 is kept. The module path and the extension location
 are as follows.
 

@@ -6,6 +6,8 @@
 
 ## 1. Overall Component Structure
 
+> The implementation package layout (players, shared types, layers) is defined by [`14`](14-implementation-architecture.md), which supersedes this section where they differ.
+
 All components below except the `advanced/sage` subgraph belong to the root module `github.com/sage-x-project/did-go` (standard core). `advanced/sage` is a separate module with its own `go.mod` ([`12`](12-standard-core-and-sage-extension.md) §3). No package in the root module imports it.
 
 ```mermaid
