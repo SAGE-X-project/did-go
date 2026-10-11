@@ -74,7 +74,7 @@ func TestValidateVectors(t *testing.T) {
 
 func TestValidateMethods(t *testing.T) {
 	t.Run("core10#verification-methods.6 DID Core 1.0 method ids are absolute DID URLs", func(t *testing.T) {
-		d := build(t, builder(t).VerificationMethod(key(t, "#k1")).Relationship(vm.Authentication, vm.Embed(key(t, "#k2"))))
+		d := build(t, builder(t).VerificationMethod(key10(t, "#k1")).Relationship(vm.Authentication, vm.Embed(key10(t, "#k2"))))
 		fs := Validate(d, spec.V10)
 		if len(fs) != 2 || fs[0].Statement != "core10#verification-methods.6" || !HasErrors(fs) {
 			t.Fatalf("got %v", fs)
@@ -82,13 +82,13 @@ func TestValidateMethods(t *testing.T) {
 		if fs := Validate(d, spec.V11); len(fs) != 0 {
 			t.Fatalf("DID 1.1 allows relative ids: %v", fs)
 		}
-		abs := build(t, builder(t).VerificationMethod(key(t, subject+"#k1")))
+		abs := build(t, builder(t).VerificationMethod(key10(t, subject+"#k1")))
 		if fs := Validate(abs, spec.V10); len(fs) != 0 {
 			t.Fatalf("absolute ids conform: %v", fs)
 		}
 	})
 	t.Run("properties undefined in DID Core 1.0 are a downlevel warning", func(t *testing.T) {
-		k := key(t, subject+"#k1")
+		k := key10(t, subject+"#k1")
 		ts := time.Unix(1700000000, 0)
 		k.Expires = &ts
 		d := build(t, builder(t).VerificationMethod(k))
@@ -98,6 +98,32 @@ func TestValidateMethods(t *testing.T) {
 		}
 		if len(Validate(d, spec.V11)) != 0 || len(Validate(d, spec.VUnknown)) != 0 {
 			t.Fatal("expires is defined by DID 1.1")
+		}
+	})
+	t.Run("Multikey and JsonWebKey types are a DID Core 1.0 downlevel warning", func(t *testing.T) {
+		jwk := map[string]any{"kty": "OKP", "crv": "Ed25519", "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}
+		for _, m := range []vm.Method{key(t, subject+"#k1"), jwkMethod(t, "k2", jwk)} {
+			d := build(t, builder(t).VerificationMethod(m))
+			var typeWarnings int
+			for _, f := range Validate(d, spec.V10) {
+				if f.Property == "verificationMethod[0].type" {
+					typeWarnings++
+					if f.Severity != SeverityWarning || !strings.Contains(f.Message, m.Type) {
+						t.Fatalf("got %v", f)
+					}
+				}
+			}
+			if typeWarnings != 1 {
+				t.Fatalf("%s: want one type warning, got %d", m.Type, typeWarnings)
+			}
+			for _, f := range Validate(d, spec.V11) {
+				if strings.HasSuffix(f.Property, ".type") {
+					t.Fatalf("DID 1.1 defines %s: %v", m.Type, f)
+				}
+			}
+		}
+		if fs := Validate(build(t, builder(t).VerificationMethod(key10(t, subject+"#k1"))), spec.V10); len(fs) != 0 {
+			t.Fatalf("other types are not flagged: %v", fs)
 		}
 	})
 	t.Run("an undecodable Multibase header is a warning", func(t *testing.T) {
@@ -117,6 +143,15 @@ func TestValidateMethods(t *testing.T) {
 			t.Fatalf("got %q", f.String())
 		}
 	})
+}
+
+// key10 is key with a verification method type that is not Multikey, so
+// that DID Core 1.0 checks do not also report the type warning.
+func key10(t *testing.T, id string) vm.Method {
+	t.Helper()
+	k := key(t, id)
+	k.Type = "Ed25519VerificationKey2020"
+	return k
 }
 
 func jwkMethod(t *testing.T, fragment string, jwk map[string]any) vm.Method {
@@ -153,7 +188,8 @@ func TestJWKAdvice(t *testing.T) {
 		if !findings(t, jwkMethod(t, "other", good), spec.V10)["core10#verification-material.4"] {
 			t.Fatal("missing warning")
 		}
-		if f := findings(t, jwkMethod(t, thumb, good), spec.V10); len(f) != 0 {
+		// The only V10 finding left is the JsonWebKey type warning.
+		if f := findings(t, jwkMethod(t, thumb, good), spec.V10); len(f) != 1 || !f[""] {
 			t.Fatalf("got %v", f)
 		}
 	})

@@ -136,6 +136,10 @@ func validateMethods(d *Document, p spec.Profile) []Finding {
 			fs = append(fs, Finding{SeverityWarning, "", where[i],
 				"expires, revoked and secret key properties are not defined by DID Core 1.0; its consumers treat them as extensions"})
 		}
+		if (m.Type == vm.TypeMultikey || m.Type == vm.TypeJsonWebKey) && !p.DefinesTerm(m.Type) {
+			fs = append(fs, Finding{SeverityWarning, "", where[i] + ".type",
+				"type " + m.Type + " is not defined by the DID Core 1.0 context; its consumers treat it as an extension"})
+		}
 		if h := m.PublicKeyMultibase; h != "" && h[0] != multiformats.HeaderBase58BTC && h[0] != multiformats.HeaderBase64URL {
 			fs = append(fs, Finding{SeverityWarning, "", where[i] + ".publicKeyMultibase",
 				"the Multibase header is not one CID 1.0 defines; the key cannot be decoded by did-go"})
