@@ -48,6 +48,7 @@ quoted specification text before a document is changed.
 python3 -I tools/xbar/extract_spec.py res10 PATH/did-resolution-1.0-crd-20261001.html <sha256> > work/res10.json
 # community drafts pinned by commit are ReSpec source files:
 python3 -I tools/xbar/extract_spec.py --respec didkey PATH/did-key-2cc490c.html <sha256> > work/didkey.json
+python3 -I tools/xbar/extract_spec.py --respec didweb PATH/did-web-ea423c1.html <sha256> > work/didweb.json
 python3 -I tools/xbar/pair_docs.py KO_DIR docs 00-feature-definition.md ... > work/units.json
 # parsers write work/parses/{ko,en,spec}/*.json following SCHEMA.md
 python3 -I tools/xbar/compare.py work out

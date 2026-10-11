@@ -10,9 +10,12 @@ ReSpec source files (the community drafts pinned by commit) leave section ids
 and the text of local section links to ReSpec. With --respec the extractor
 derives the id of a section without one from its heading the way ReSpec does,
 fills an empty local link with the title of the section it points to,
-closes a list item whose end tag is omitted when the next one starts, and
+closes a list item whose end tag is omitted when the next one starts,
 treats a note or issue nested in an algorithm step as its own informative
-block. Without --respec the output for the published W3C specifications is
+block, ignores an end tag that closes no open element (a stray </p>, which an
+HTML parser also drops), and treats an ordered list introduced by a paragraph
+saying "the following steps MUST be executed" as an algorithm list, since its
+steps are then normative even without a keyword. Without --respec the output for the published W3C specifications is
 unchanged.
 
 Usage: extract_spec.py [--respec] SPEC_KEY HTML_PATH SHA256 > statements.json
@@ -34,6 +37,7 @@ BLOCK_TAGS = {"p", "li", "dd", "dt", "td", "th", "h2", "h3", "h4", "h5", "h6"}
 SKIP_TAGS = {"script", "style", "pre"}
 INFORMATIVE_CLASSES = {"informative", "note", "example", "issue", "advisement"}
 VOID_TAGS = {"br", "img", "hr", "meta", "link", "input", "wbr", "col", "source"}
+STEPS_INTRO = re.compile(r"\bfollowing steps (MUST|SHALL)\b")
 ABBREVIATIONS = ("e.g.", "i.e.", "etc.", "vs.", "cf.", "Sec.")
 
 
@@ -86,6 +90,7 @@ class Extractor(HTMLParser):
         self.title = {}
         self.next_uid = 0
         self.last_term = ""
+        self.last_block = None
 
     def section(self):
         for frame in reversed(self.stack):
@@ -106,6 +111,10 @@ class Extractor(HTMLParser):
             self.close_open_item()
         parent = self.stack[-1] if self.stack else None
         frame = Frame(tag, dict(attrs), parent, self.respec)
+        if self.respec and tag == "ol" and self.last_block is not None:
+            text, section = self.last_block
+            if STEPS_INTRO.search(text) and section == self.section():
+                frame.algorithm = True
         if frame.block:
             owner = self.block_frame()
             if owner is not None:
@@ -131,6 +140,8 @@ class Extractor(HTMLParser):
 
     def handle_endtag(self, tag):
         if tag in VOID_TAGS:
+            return
+        if self.respec and all(frame.tag != tag for frame in self.stack):
             return
         while self.stack:
             frame = self.stack.pop()
@@ -167,6 +178,7 @@ class Extractor(HTMLParser):
             return
         if frame.tag == "dt":
             self.last_term = text
+        self.last_block = (text, section)
         self.blocks.append(
             {
                 "term": self.last_term if frame.tag == "dd" else "",

@@ -11835,6 +11835,294 @@
    "owners": [
     "method/key"
    ]
+  },
+  {
+   "id": "didweb-ea423c1#method-name.1",
+   "spec": "didweb-ea423c1",
+   "section": "method-name",
+   "term": "",
+   "text": "A DID that uses this method MUST begin with the following prefix: did:web.",
+   "textSHA256": "4f8e8dc622af3f2ce7619807c7c4a59d1c084e9af4bdd20f6cde96feb1f00d52",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/web"
+   ]
+  },
+  {
+   "id": "didweb-ea423c1#method-name.2",
+   "spec": "didweb-ea423c1",
+   "section": "method-name",
+   "term": "",
+   "text": "Per the DID specification, this string MUST be in lowercase.",
+   "textSHA256": "20c5e7db01ede69fd08ec9552146d8c0a547c7ae3cabe164fde891cc1036aec6",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/web"
+   ]
+  },
+  {
+   "id": "didweb-ea423c1#method-specific-identifier.1",
+   "spec": "didweb-ea423c1",
+   "section": "method-specific-identifier",
+   "term": "",
+   "text": "The method specific identifier MUST match the common name used in the SSL/TLS certificate, and it MUST NOT include IP addresses.",
+   "textSHA256": "7b93a6c776a2e5fd7ede8af1c5a8746b2632106e43b06672c1de2cf68701c893",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/web"
+   ]
+  },
+  {
+   "id": "didweb-ea423c1#method-specific-identifier.2",
+   "spec": "didweb-ea423c1",
+   "section": "method-specific-identifier",
+   "term": "",
+   "text": "A port MAY be included and the colon MUST be percent encoded to prevent a conflict with paths.",
+   "textSHA256": "f31cf172eaae757743d6598b3c9dd2e21638d37340176f5a40a80e49f1ee2e35",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/web"
+   ]
+  },
+  {
+   "id": "didweb-ea423c1#method-specific-identifier.3",
+   "spec": "didweb-ea423c1",
+   "section": "method-specific-identifier",
+   "term": "",
+   "text": "Directories and subdirectories MAY optionally be included, delimited by colons rather than slashes.",
+   "textSHA256": "7d4715c929d0eefbe751084ba6f49079c98d194b47b93f4a46a8affa2d157d33",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/web"
+   ]
+  },
+  {
+   "id": "didweb-ea423c1#create-register.1",
+   "spec": "didweb-ea423c1",
+   "section": "create-register",
+   "term": "",
+   "text": "If an optional port is specified on the domain, the port colon splitting the host and the port MUST be percent encoded to prevent collision with the path.",
+   "textSHA256": "43217df12fe4cbf39d3bfdb829204f62d7b09d73305651238a4121691eb36929",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/web"
+   ]
+  },
+  {
+   "id": "didweb-ea423c1#read-resolve.1",
+   "spec": "didweb-ea423c1",
+   "section": "read-resolve",
+   "term": "",
+   "text": "The following steps MUST be executed to resolve the DID document from a Web DID:",
+   "textSHA256": "67ea276fa845425bd214449eb94f9d53adb7f60f7a94208874f0e823af489307",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/web"
+   ]
+  },
+  {
+   "id": "didweb-ea423c1#read-resolve.2",
+   "spec": "didweb-ea423c1",
+   "section": "read-resolve",
+   "term": "",
+   "text": "Replace \":\" with \"/\" in the method specific identifier to obtain the fully qualified domain name and optional path.",
+   "textSHA256": "64dd1f6e5ca60592b94ec46bb98370fd57334b8f0ea05cdf3b5f2800b3764cb9",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/web"
+   ]
+  },
+  {
+   "id": "didweb-ea423c1#read-resolve.3",
+   "spec": "didweb-ea423c1",
+   "section": "read-resolve",
+   "term": "",
+   "text": "If the domain contains a port percent decode the colon.",
+   "textSHA256": "f8e6d0be543eb7a91775f1b057468ee038c3c59547e4083926e3db9a7699db42",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/web"
+   ]
+  },
+  {
+   "id": "didweb-ea423c1#read-resolve.4",
+   "spec": "didweb-ea423c1",
+   "section": "read-resolve",
+   "term": "",
+   "text": "Generate an HTTPS URL to the expected location of the DID document by prepending https://.",
+   "textSHA256": "176041deecdd09863318681bace3667031b09635a85e6f05eba1fdacc509bd29",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/web"
+   ]
+  },
+  {
+   "id": "didweb-ea423c1#read-resolve.5",
+   "spec": "didweb-ea423c1",
+   "section": "read-resolve",
+   "term": "",
+   "text": "If no path has been specified in the URL, append /.well-known.",
+   "textSHA256": "0db53898f31f0bef8c5de138afd60c560ad819fb8d88369a69ada4763e718b97",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/web"
+   ]
+  },
+  {
+   "id": "didweb-ea423c1#read-resolve.6",
+   "spec": "didweb-ea423c1",
+   "section": "read-resolve",
+   "term": "",
+   "text": "Append /did.json to complete the URL.",
+   "textSHA256": "a74e27e015572542f782ebf9de72fd39d3370d42c56afc7b3098e4cacbb1fe15",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/web"
+   ]
+  },
+  {
+   "id": "didweb-ea423c1#read-resolve.7",
+   "spec": "didweb-ea423c1",
+   "section": "read-resolve",
+   "term": "",
+   "text": "Perform an HTTP GET request to the URL using an agent that can successfully negotiate a secure HTTPS connection, which enforces the security requirements as described in Security and privacy considerations.",
+   "textSHA256": "1b4abdfdc3a2bea878c6e785965ad9aeaf2576b196ab09b66c331f64df209f86",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/web"
+   ]
+  },
+  {
+   "id": "didweb-ea423c1#read-resolve.8",
+   "spec": "didweb-ea423c1",
+   "section": "read-resolve",
+   "term": "",
+   "text": "Verify that the ID of the resolved DID document matches the Web DID being resolved.",
+   "textSHA256": "5f4367302c268e344d53b9f62107b262662c12826a3fb03a33b8b787ca8286be",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "in-scope",
+   "reason": "not linked by the design review; owner assigned by section",
+   "owners": [
+    "method/web"
+   ]
+  },
+  {
+   "id": "didweb-ea423c1#read-resolve.9",
+   "spec": "didweb-ea423c1",
+   "section": "read-resolve",
+   "term": "",
+   "text": "When performing the DNS resolution during the HTTP GET request, the client SHOULD utilize [[RFC8484]] in order to prevent tracking of the identity being resolved.",
+   "textSHA256": "e4bbdc42af6e47fc13dad63a8fe052dc3b16e11e5a2cae1a082688084bb819b6",
+   "algorithmStep": true,
+   "parent": null,
+   "scope": "out-of-scope",
+   "reason": "deployment: DNS resolution is performed by the dialer of the *http.Client the caller injects; did-go ships no DNS-over-HTTPS resolver and documents that the caller configures one (method/web package documentation)",
+   "owners": []
+  },
+  {
+   "id": "didweb-ea423c1#did-document-integrity-verification.1",
+   "spec": "didweb-ea423c1",
+   "section": "did-document-integrity-verification",
+   "term": "",
+   "text": "Additional mechanisms such as Hashlinks MAY be utilized to aid in integrity protection and verification of the DID document.",
+   "textSHA256": "3e5455c5a81d5ed4519f36221772e55ccc79d5479cfcb43e639a222edece31ed",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "out-of-scope",
+   "reason": "informative",
+   "owners": []
+  },
+  {
+   "id": "didweb-ea423c1#in-transit-security.1",
+   "spec": "didweb-ea423c1",
+   "section": "in-transit-security",
+   "term": "",
+   "text": "Guidance from NIST SP 800-52 Rev. 2 or superceding, MUST be followed for delivery of a `did:web` document.",
+   "textSHA256": "e258f1d124e17612cba7d96bbb41fc8c414a2f21a5e5b73ca5b9984a8fd87cd3",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "out-of-scope",
+   "reason": "informative",
+   "owners": []
+  },
+  {
+   "id": "didweb-ea423c1#in-transit-security.2",
+   "spec": "didweb-ea423c1",
+   "section": "in-transit-security",
+   "term": "",
+   "text": "TLS configuration MUST use at least SHA256, and SHOULD use SHA384, POLY1305, or stronger, depending on the needs of your operating environment.",
+   "textSHA256": "f22a18ab295b90bd9a50815d29e0ee63549c2a9a93a49a3e4f180bfb614e101b",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "out-of-scope",
+   "reason": "informative",
+   "owners": []
+  },
+  {
+   "id": "didweb-ea423c1#in-transit-security.3",
+   "spec": "didweb-ea423c1",
+   "section": "in-transit-security",
+   "term": "",
+   "text": "Delete action MAY be performed by domain name registrars or DNS lookup services.",
+   "textSHA256": "e94869b82e41f33adff7da87ca257c29c8aa2908666ca8fc1c9dae14a827fbd9",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "out-of-scope",
+   "reason": "informative",
+   "owners": []
+  },
+  {
+   "id": "didweb-ea423c1#in-transit-security.4",
+   "spec": "didweb-ea423c1",
+   "section": "in-transit-security",
+   "term": "",
+   "text": "As of this writing, TLS 1.2 or higher SHOULD be configured to use only strong ciphers suites and to use sufficiently large key sizes.",
+   "textSHA256": "48bec39d1991b9ad8f19e47e5f5c3bf16a5fae591783b53d1aa7b0bef3417219",
+   "algorithmStep": false,
+   "parent": null,
+   "scope": "out-of-scope",
+   "reason": "informative",
+   "owners": []
   }
  ]
 }
