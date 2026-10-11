@@ -15,6 +15,8 @@
 # Library scope
 
 - did-go implements W3C DID Core 1.0 and DID 1.1 side by side. Cite the dated specification text that each behavior follows.
-- The root module must not depend on SAGE. SAGE-specific code lives in its own Go module.
+- Standard DID support comes first and must be complete without SAGE. SAGE support is an opt-in advanced extension that may only be stricter than the standard.
+- The root module must not depend on SAGE. SAGE-specific code lives in its own Go module under `advanced/`.
+- Write all documentation in English.
 - Never put private keys, trust decisions or key custody into the library.
 - Every validation rule needs a positive and a negative test. Keep statement coverage at or above 90%.
