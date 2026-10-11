@@ -192,7 +192,7 @@ flowchart LR
 - **Main flow:**
   1. **Consume a v1.0 document**: input with `did+json`/`did+ld+json` or `@context[0]==…/did/v1` is detected as V10 and normalized into the single core model (extension of UC-4).
   2. **Produce a v1.0 document**: specify `SpecVersion=V10` to serialize with the v1 context and a legacy media type. Documents without `service.id` are rejected (v1.0 §5.4 MUST).
-  3. **v1.0 contract resolution**: a legacy client calls `compat.V10Resolver.resolveRepresentation()`, which performs an internal v1.1 resolve, V10 production, and RFC9457 to string error mapping (`09` §6.1).
+  3. **v1.0 contract resolution**: a legacy client calls `compat.V10Resolver.resolveRepresentation()`, which performs an internal v1.1 resolve (the core transcodes to the V10 representation to match accept) and RFC9457 to string error mapping (`09` §6.1).
   4. The detected version is reported to the caller as `ConsumeInfo.DetectedVersion`.
 - **Alternatives:**
   - 2a. Target is V10 but `service.id` is missing: `ConformanceError`.

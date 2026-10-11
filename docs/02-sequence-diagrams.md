@@ -99,14 +99,14 @@ sequenceDiagram
     participant JSON as json decoder
 
     Verifier->>Cons: Consume(bytes, mediaType)  %% application/did | did+json | did+ld+json
-    Cons->>Cons: first version signal: media type (did+json/did+ld+json → V10, 09 §4 rule 1)
+    Cons->>Cons: record the declared media type (09 §4)
     Cons->>JSON: decode root
     alt root is not a JSON Object
         JSON-->>Cons: not object
         Cons-->>Verifier: ErrNonConforming
     else
         JSON-->>Cons: object
-        Cons->>Cons: settle version: @context[0] (…/v1→V10, …/v1.1→V11, absent→VUnknown, 09 §4 rules 2-4)
+        Cons->>Cons: settle version: @context[0] first (…/v1→V10, …/v1.1→V11), else did+json→V10, did→V11, low-precision→Expected or VUnknown (09 §4 steps 1 to 4)
         Cons->>Cons: map JSON types → data model (normalize into the single v1.1 superset model)
         Cons->>Cons: known repr-specific (@context etc.) → representation-specific-entries (rule 3)
         Cons->>Cons: unrecognized non-repr entries → data-model extension properties (rule 4)
@@ -114,7 +114,7 @@ sequenceDiagram
             Cons->>Cons: JSON-LD: drop undefined terms (against the context of the detected version)
         end
         Cons->>Cons: validate conformance
-        Cons-->>Verifier: Document + ConsumeInfo{DetectedVersion}
+        Cons-->>Verifier: Document + ConsumeInfo{DetectedVersion, Mismatch, Assumed}
     end
 ```
 
@@ -154,10 +154,11 @@ sequenceDiagram
                 M-->>R: docMeta{deactivated:true}
                 R-->>Verifier: null, meta{}, docMeta{deactivated:true}
             else ok
-                M-->>R: raw bytes(ReadResult.Data), docMeta{versionId,updated}
-                R->>Cons: Consume(bytes, mediaType)
-                Cons-->>R: Document + ConsumeInfo
-                R-->>Verifier: doc, resolutionMeta{contentType}, docMeta
+                M-->>R: ReadResult{Data, ContentType}, docMeta{versionId,updated}
+                R->>Cons: Consume(Data, ContentType)
+                Cons-->>R: Document + ConsumeInfo (INVALID_DID_DOCUMENT on failure)
+                R->>R: contentType from the detected representation, accept negotiation, transcode if needed (12 §6.2)
+                R-->>Verifier: Result{doc, Raw, Info, Source, resolutionMeta{contentType}, docMeta}
             end
         end
     end
@@ -297,20 +298,18 @@ sequenceDiagram
     actor L as Legacy Client (v1.0)
     participant C10 as compat.V10Resolver
     participant R as resolution.Resolver (v1.1 core)
-    participant Prod as representation.Producer
 
     L->>C10: resolveRepresentation(did, {accept:"application/did+ld+json"})
-    C10->>R: Resolve(did, opts)
-    R-->>C10: Result{doc, resolutionMeta, docMeta}
+    C10->>R: Resolve(did, opts)  %% accept passed unchanged
+    R->>R: consume and validate driver bytes, transcode to V10 if they do not match accept, record Source (12 §6.2)
+    R-->>C10: Result{doc, Raw, Source, resolutionMeta, docMeta}
     alt RFC9457 error
         C10->>C10: map type URL → string code (…#NOT_FOUND → "notFound", 09 §6.1)
         C10-->>L: meta{error:"notFound"}, null, {}
     else deactivated (not an error, same in both versions)
         C10-->>L: meta{}, null, docMeta{deactivated:true}
     else ok
-        C10->>Prod: Produce(doc, {SpecVersion:V10, JSONLD:based on accept})
-        Prod-->>C10: bytes, "application/did+ld+json"
-        C10-->>L: meta{contentType:"application/did+ld+json"}, bytes, docMeta
+        C10-->>L: meta{contentType: resolutionMeta.contentType}, Raw, docMeta
     end
     Note over C10: the resolve() path does not set contentType (v1.0 §7.1.2 MUST NOT)
 ```

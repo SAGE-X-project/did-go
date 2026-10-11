@@ -1,9 +1,10 @@
 # Standard core and SAGE extension
 
-> Written 2026-10-11. This document does not change documents 00 to 10. It
-> covers what they leave open: how SAGE uses this library, how standard and
-> SAGE-specific behavior are separated, and where the issuer, holder and
-> verifier roles will sit.
+> Written 2026-10-11. This document adds design that documents 00 to 10 leave
+> open: how SAGE uses this library, how standard and SAGE-specific behavior are
+> separated, and where the issuer, holder and verifier roles will sit. Where it
+> revises earlier rules (09 §4, 07 §7, 05 §4 to §6), those documents were
+> updated to match on 2026-10-11.
 
 ## 1. Why this document exists
 
@@ -58,7 +59,7 @@ are as follows.
 ```
 github.com/sage-x-project/did-go            (root module, standard core)
 ├── spec/ did/ document/ vm/ representation/ jsonld/
-├── resolution/ (+ resolution/compat)
+├── resolution/ (+ resolution/compat, resolution/universal)
 ├── method/ (+ method/key, method/web)
 ├── crypto/
 └── advanced/
@@ -156,49 +157,89 @@ not implemented.
 
 ## 6. Additions to the earlier design
 
-### 6.1 Version detection when consuming (supplements 09 §4)
+### 6.1 Version detection when consuming (revises 09 §4)
 
-09 §4 looks at the media type first and `@context` second. Real input often has
-a media type that disagrees with its content. The DID Resolution result example
-sends a 1.0 `@context` as `application/did`, and `did:web` documents usually
-arrive as `application/json`. DID 1.1 §6.3.1 discourages raising errors when
-the intended media type can be determined from the payload. Detection is
-therefore refined as follows.
+Before this revision, 09 §4 looked at the media type first and `@context`
+second. Real input often has a media type that disagrees with its content. The
+DID Resolution result example sends a 1.0 `@context` as `application/did`, and
+`did:web` documents usually arrive as `application/json`. DID 1.1 §6.3.1
+discourages raising errors when the intended media type can be determined from
+the payload. That section is marked "This section is non-normative", so the
+rules below and decision 19 are a design choice guided by it, not a spec
+requirement. Detection follows this order, and 09 §4 and 05 §4 were changed to
+the same order.
 
 1. If `@context` is present, its first value decides: `…/did/v1` is V10 and
    `…/did/v1.1` is V11. A declared DID media type that disagrees is recorded in
-   `ConsumeInfo` as a mismatch, not raised as an error.
+   `ConsumeInfo.Mismatch`, not raised as an error.
 2. If `@context` is absent, `application/did+json` means V10 and
-   `application/did` means V11.
+   `application/did` means V11. `application/did+ld+json` is an error, because
+   DID Core 1.0 §6.3.1 requires `@context` in JSON-LD production.
 3. If the media type is a low-precision one (`application/json`,
-   `application/ld+json`) and there is no `@context`, the version the caller
-   expects is used. Without an expected version the result is `VUnknown` and the
-   document is consumed under v1.1 rules (the superset principle of 09 §4).
-   `ConsumeInfo` records that the version was assumed.
+   `application/ld+json`) and there is no `@context`, `ConsumeOptions.Expected`
+   is used. Without an expected version the result is `VUnknown` and the
+   document is consumed under v1.1 rules (the superset principle of 09 §4). In
+   both cases `ConsumeInfo.Assumed` is set to true.
 4. Any other first `@context` value, input that is not a JSON object, or input
    whose top-level `id` is not a valid DID is an error.
 
-`ConsumeInfo` gains `Mismatch` and `Assumed` fields. A strict option turns every
-mismatch and assumption into an error. The SAGE consumption profile uses strict
-mode.
+`ConsumeInfo` gains `Mismatch` and `Assumed` fields. `ConsumeOptions.Strict`
+turns every mismatch and assumption into an error. The SAGE consumption profile
+uses strict mode.
 
-### 6.2 Resolution results keep the original bytes (supplements 07 §7)
+### 6.2 Resolution results and the driver contract (revises 07 §7, 05 §5 and §6)
 
-A resolve result returns the document bytes exactly as the driver produced
-them, together with their `contentType`. The parsed `Document` and the detection
-information sit beside them. With the original bytes a caller can verify a
-signature over them, or parse them again, without trusting `did-go`'s
-re-serialization.
+A driver returns, in `method.ReadResult`, the document bytes together with the
+media type it labels them with (`ContentType`). Each driver declares the media
+types it can produce through `Produces() []string`. A resolve result
+(`resolution.Result`) carries the following.
 
-Each driver declares the versions and media types it can produce. When the
-resolver receives an `accept` value the driver cannot produce, it refuses with
-`FEATURE_NOT_SUPPORTED` before calling the driver. The DID Resolution resolve
-algorithm has no representation-specific error and uses this error for an
-unsupported option; `REPRESENTATION_NOT_SUPPORTED` is defined only for the
-dereferencing `accept` option. This choice is an interpretation, and it matches
-the mapping in DIDP-05 of the sage-spec proposal. There is no global driver
-registry, and no driver registers itself as an import side effect. Users add
-drivers to a resolver explicitly.
+- `Raw`: the bytes returned to the caller.
+- `Info`: the `representation.ConsumeInfo` obtained while consuming.
+- `Source`: the bytes the driver originally returned and their media type. It
+  is set only when the core transcoded to another representation.
+
+Because bytes are returned, a caller can verify a signature over them, or parse
+them again, without trusting `did-go`'s re-serialization. If the core
+transcoded, the original bytes remain in `Source`.
+
+The resolve path works in this order.
+
+1. The core always runs `Consume` and standard validation on the bytes the
+   driver returned, using the driver's `ContentType` as the declared media
+   type. Content that fails standard validation is returned as
+   `INVALID_DID_DOCUMENT`.
+2. The result `contentType` is not copied from the driver label; it is set from
+   the detected representation. V10 without `@context` is
+   `application/did+json`, V10 with `@context` is `application/did+ld+json`,
+   and V11 is `application/did`. A disagreement with the driver label is
+   recorded in `Info`.
+3. If `accept` is present, it is matched with the RFC 9110 media range and
+   q-value rules. DID Resolution §4.1 says the resolver SHOULD use the `accept`
+   value "if such a representation is supported and available". If the driver
+   can produce an acceptable type, the driver bytes are returned as is.
+   Otherwise the core checks whether it can produce an acceptable
+   representation from the validated document. With the superset model and a
+   Producer that takes `SpecVersion`, the core can produce all three media
+   types. If it can, it transcodes, sets `Source`, and returns the produced
+   bytes.
+4. If no acceptable representation can be produced, the result is
+   `FEATURE_NOT_SUPPORTED`. The DID Resolution resolve algorithm has no
+   representation-specific error and uses this error for an unsupported option;
+   `REPRESENTATION_NOT_SUPPORTED` is defined only for the dereferencing
+   `accept` option. This choice is an interpretation, and it matches the
+   mapping in DIDP-05 of the sage-spec proposal.
+
+The SAGE profile (`advanced/sage`) is stricter. It requires an exact match on a
+single media type, accepts no q-values, and does not fall back to transcoding
+(the same as DIDP-02 of the sage-spec proposal).
+
+The extension may only make validation stricter. Neither a driver nor a profile
+can disable the core validation on the resolve path. So no driver, including
+`advanced/sage`, can bypass standard validation.
+
+There is no global driver registry, and no driver registers itself as an import
+side effect. Users add drivers to a resolver explicitly.
 
 ### 6.3 Input limits and security rules (supplements the NFRs of 00)
 
@@ -267,9 +308,11 @@ candidate approach and has not been designed.
 | 16 | The standard core comes first; SAGE features are an opt-in advanced extension | `did-go` must be useful without SAGE and usable by SAGE as is (§2) |
 | 17 | `advanced/sage` has its own `go.mod` | Keeps the SAGE core, its license and its release cadence out of the root module (§3) |
 | 18 | A DID document is not key authority for a protected operation | Authority comes only from the SAGE record; same as proposal DIDP-04 (§4) |
-| 19 | A mismatch between media type and `@context` is recorded, and is an error only in strict mode | DID 1.1 §6.3.1 and the DID Resolution example (§6.1) |
-| 20 | Resolve results keep the original bytes and `contentType`; drivers declare the forms they can produce | Signature verification without trusting re-serialization; `accept` handling (§6.2) |
+| 19 | A mismatch between media type and `@context` is recorded, and is an error only in strict mode | A design choice guided by DID 1.1 §6.3.1, which is non-normative; the DID Resolution example also supports it (§6.1) |
+| 20 | Resolve results keep the bytes returned (`Raw`), the detection result (`Info`) and, after transcoding, the original (`Source`); drivers state `ContentType` and the forms they can produce (`Produces`) | Signature verification without trusting re-serialization; `accept` handling (§6.2) |
 | 21 | Staking is not a basis for trust or for admission | Entry barrier, and attacks whose gain exceeds the stake (§7) |
+| 22 | The core consumes every driver output and runs standard validation; drivers and profiles cannot disable it | The extension can only be stricter (§2 rule 3). The result `contentType` comes from the detected representation (§6.2) |
+| 23 | The standard core matches `accept` with RFC 9110 rules and transcodes when needed; the SAGE profile matches exactly one type and does not transcode | The SHOULD in DID Resolution §4.1 ("if such a representation is supported and available"); DIDP-02 of the sage-spec proposal (§6.2) |
 
 ## 9. Open decisions
 

@@ -55,7 +55,7 @@ and DID Resolution, is extracted into [06](06-cid-data-model.md) and
 | [08-verification-report.md](08-verification-report.md) | Record of the audits against the three specifications and the tensions found between them |
 | [09-v1.0-compat.md](09-v1.0-compat.md) | v1.0 Recommendation comparison, version detection and production profiles, the v1.0 resolution adapter and its error mapping |
 | [10-abnf-appendix.md](10-abnf-appendix.md) | Full ABNF (the parser's reference), conformance test vectors, context file digests |
-| [12-standard-core-and-sage-extension.md](12-standard-core-and-sage-extension.md) | Standard-first principle and the advanced SAGE extension, module layout, trust boundary, agent information management, role layers, decisions 16 to 21 |
+| [12-standard-core-and-sage-extension.md](12-standard-core-and-sage-extension.md) | Standard-first principle and the advanced SAGE extension, module layout, trust boundary, agent information management, role layers, decisions 16 to 23 |
 | [standards.md](standards.md) | Dated W3C publications the design follows, with SHA-256 |
 
 Number 11 is not published here: it is a jurisdiction-specific legal review

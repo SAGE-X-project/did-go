@@ -6,7 +6,7 @@
 
 ## 1. Overall Component Structure
 
-All components below belong to the root module `github.com/sage-x-project/did-go` (standard core). The SAGE extension lives outside it, in the separate `advanced/sage` module with its own `go.mod` ([`12`](12-standard-core-and-sage-extension.md) §3). No package in the root module imports it.
+All components below except the `advanced/sage` subgraph belong to the root module `github.com/sage-x-project/did-go` (standard core). `advanced/sage` is a separate module with its own `go.mod` ([`12`](12-standard-core-and-sage-extension.md) §3). No package in the root module imports it.
 
 ```mermaid
 flowchart TB
@@ -135,4 +135,4 @@ flowchart TB
     end
 ```
 
-Both deployment forms reuse the same core. Service mode exposes the DID-RESOLUTION HTTP binding (`application/did` responses) through the `resolution/universal` adapter. **v1.0 clients** have no separate endpoint; they negotiate a V10 representation on the same binding through the Accept header (`application/did+ld+json`/`did+json`) (`09` §6.3).
+Both deployment forms reuse the same core. Service mode exposes the DID-RESOLUTION HTTP binding (`application/did` responses) through the `resolution/universal` adapter. **v1.0 clients** have no separate endpoint; they negotiate a V10 representation on the same binding through the Accept header (`application/did+ld+json`/`did+json`). If the driver cannot produce that format, the core transcodes the validated document to V10 and keeps the driver original in `Source` (`09` §6.3, `12` §6.2).

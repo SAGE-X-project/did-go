@@ -105,16 +105,18 @@ HEXDIG        = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
 | IU2 | `did:example:123?q=^v` | `^` is not a pchar or query character |
 | IU3 | `did:EXAMPLE:123/path` | If the DID part is invalid, the whole URL is invalid |
 
-### 2.5 Version detection vectors (every row of the precedence table in `09` §4)
+### 2.5 Version detection vectors (every step of the detection order in `09` §4)
 
 | # | Media type | `@context[0]` | Expected result |
 |---|------------|---------------|-----------------|
-| D1 | `application/did+json` | (none) | **V10** (rule 1) |
-| D2 | `application/did+ld+json` | `…/did/v1` | **V10** (rule 1) |
-| D3 | `application/did` | `…/did/v1` | **V10** (rule 2) |
-| D4 | `application/did` | `…/did/v1.1` | **V11** (rule 3) |
-| D5 | `application/did` | (none) | **VUnknown** → consumed with v1.1 rules (rule 4) |
-| D6 | `application/did+json` | `…/did/v1.1` | **V10** (rule 1 wins; checks that the precedence is fixed) |
+| D1 | `application/did+json` | (none) | **V10** (step 2) |
+| D2 | `application/did+ld+json` | `…/did/v1` | **V10** (step 1) |
+| D3 | `application/did` | `…/did/v1` | **V10**, `Mismatch` recorded (step 1) |
+| D4 | `application/did` | `…/did/v1.1` | **V11** (step 1) |
+| D5 | `application/did` | (none) | **V11** (step 2) |
+| D6 | `application/did+json` | `…/did/v1.1` | **V11**, `Mismatch` recorded (step 1; `@context` comes before the media type). An error in Strict mode |
+| D7 | `application/did+ld+json` | (none) | Error (step 2, v1.0 §6.3.1) |
+| D8 | `application/json` | (none) | Without `Expected`, **VUnknown** → consumed with v1.1 rules, `Assumed` recorded (step 3). An error in Strict mode |
 
 ### 2.6 Document conformance vectors
 

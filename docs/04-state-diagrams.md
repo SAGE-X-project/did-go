@@ -27,7 +27,8 @@ stateDiagram-v2
     end note
     note right of Deactivated
         Deactivation is irreversible (subject to method policy).
-        The document may still resolve, but with the deactivated flag set.
+        A Resolve result has didDocument=null, didDocumentMetadata.deactivated=true,
+        and HTTP 410 (DID Resolution §4.4).
     end note
 ```
 
@@ -80,10 +81,10 @@ stateDiagram-v2
     }
     state "Consume (UC-4)" as C {
         [*] --> C_TypeCheck
-        C_TypeCheck --> C_RootCheck: media type judged = primary version signal (09 §4 rule 1)
+        C_TypeCheck --> C_RootCheck: declared media type recorded (09 §4)
         C_RootCheck --> C_Error: root ≠ JSON Object
         C_RootCheck --> C_VerDetect: JSON Object
-        C_VerDetect --> C_Map: version fixed (@context[0] → V10/V11/VUnknown, 09 §4 rules 2 to 4)
+        C_VerDetect --> C_Map: version fixed (@context[0] first, else media type or Expected, 09 §4 steps 1 to 4)
         C_Map --> C_Preserve: type mapping
         C_Preserve --> C_LD: rule 3 known repr-specific→map / rule 4 unrecognized→data model
         C_LD --> C_Validate: undefined term drop (JSON-LD)

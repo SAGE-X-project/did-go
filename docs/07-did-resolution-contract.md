@@ -165,9 +165,9 @@ The HTTP column is the status code table of `#bindings-https`.
 | METHOD_NOT_SUPPORTED | `…#METHOD_NOT_SUPPORTED` | 501 |
 | FEATURE_NOT_SUPPORTED | `…#FEATURE_NOT_SUPPORTED` | 501 |
 | INTERNAL_ERROR | `…#INTERNAL_ERROR` | 500 |
-| (type not in the table) | any other URI | Determined by the implementation. did-go uses the code of the type named by `Refines`, and 500 if there is none (local policy) |
+| (type not in the table) | any other URI | Determined by the implementation. did-go uses the code of the type named by `Refines`, otherwise the error's own `Status`, and 500 if that is also absent (local policy) |
 
-For a type not in the table, the spec says the status code "is determined by the implementation". Up to the CR Snapshot, 500 was required; this CRD changed that (Revision History). did-go's 500 is therefore a local policy, not a spec requirement.
+For a type not in the table, the spec says the status code "is determined by the implementation". Up to the CR Snapshot, 500 was required; this CRD changed that (Revision History). did-go's 500 is therefore a local policy, not a spec requirement. The binding fixes the code of a type that is in the table, so an extension cannot change it through `Status`.
 
 `#errors` links `INVALID_DID_DOCUMENT` to §4.4 (`#resolving-algorithm`), but no algorithm step emits this type.
 
@@ -300,8 +300,25 @@ type DIDParameters struct {
     Extra       map[string]string
 }
 
+// Result is «didResolutionMetadata, didDocument, didDocumentMetadata» plus
+// the bytes returned (Raw), the detection result (Info) and the pre-transcoding original (Source) (12 §6.2).
+type Result struct {
+    Document           *document.Document
+    Raw                []byte                     // bytes returned to the caller; representation is ResolutionMetadata.ContentType
+    Info               representation.ConsumeInfo // detection result from consuming the driver bytes
+    Source             *SourceBytes               // set only when the core transcoded
+    ResolutionMetadata ResolutionMetadata
+    DocumentMetadata   DocumentMetadata
+}
+
+// SourceBytes holds the bytes the driver originally returned and their media type.
+type SourceBytes struct {
+    Data        []byte
+    ContentType string
+}
+
 type Resolver interface {
-    Resolve(ctx context.Context, did did.DID, opts ResolutionOptions) (*document.Document, ResolutionMetadata, DocumentMetadata)
+    Resolve(ctx context.Context, did did.DID, opts ResolutionOptions) Result
 }
 
 type Dereferencer interface {
@@ -316,13 +333,14 @@ var bindingStatus = map[string]int{
     nsDID + "FEATURE_NOT_SUPPORTED": 501, nsDID + "INTERNAL_ERROR": 500,
 }
 
-// HTTP status mapping. The spec leaves the code for a type not in the table to the implementation.
-// did-go uses the code of the type named by Refines, and 500 if that is also absent (local policy).
+// HTTP status mapping. The code fixed by the binding table comes first, and an extension cannot change it.
+// The spec leaves the code for a type not in the table to the implementation. did-go uses the code of
+// the type named by Refines, then the error's own Status, then 500 (local policy).
 func (e *Error) HTTPStatus() int {
     if e == nil { return 500 }
-    if e.Status != 0 { return e.Status }
     if s, ok := bindingStatus[e.Type]; ok { return s }
     if s, ok := bindingStatus[e.Refines]; ok { return s }
+    if e.Status != 0 { return e.Status }
     return 500
 }
 ```
@@ -335,4 +353,5 @@ func (e *Error) HTTPStatus() int {
 5. Service endpoint URL = RFC3986 §5 (base=endpoint, ref=relativeRef) + fragment inheritance. Reject if the endpoint already has a fragment.
 6. HTTP: GET is required, `accept`=Accept header, other options go in the query or body. Follow the status code mapping. The `Content-Type` of a 200 response must equal the `contentType` in the metadata.
 7. `text/uri-list` dereferencing → 303. `Location` is the selected service endpoint URL and the body is empty. Write `contentType` into both `dereferencingMetadata` and `contentMetadata`, and accept it from either on input (caveat 8).
-8. The HTTP status for an error type not in the table is chosen through `Refines`, and 500 if there is none. The 500 is a did-go local policy.
+8. The HTTP status is looked up first in the binding table by `Type`. If the type is not in the table, the table code of the type named by `Refines` is used, then the error's `Status`, and finally 500. An extension cannot change a code the table fixes. The steps from `Refines` on are did-go local policy.
+9. On the resolve path the core always consumes the driver bytes with the driver's `ContentType` and runs standard validation. A failure is `INVALID_DID_DOCUMENT`. The result `contentType` comes from the detected representation; `accept` is matched with RFC 9110 rules, and the core transcodes when needed. If no acceptable representation can be produced, the result is `FEATURE_NOT_SUPPORTED` ([`12`](12-standard-core-and-sage-extension.md) §6.2).

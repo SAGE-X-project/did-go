@@ -93,7 +93,7 @@ Each feature is identified as `FR-x` and has a normative basis (spec line/sectio
 
 | ID | Feature | Normative basis | Acceptance criteria |
 |----|---------|-----------------|---------------------|
-| FR-V1 | Version detection | v1.0 REC §6.2/§6.3, v1.1 §JSON-LD | Media type (`did+json`/`did+ld+json` gives V10), then `@context[0]` (`…/did/v1` gives V10, `…/did/v1.1` gives V11), otherwise VUnknown (processed with v1.1 rules). Fixed priority order (`09` §4). |
+| FR-V1 | Version detection | v1.0 REC §6.2/§6.3, v1.1 §JSON-LD | If `@context[0]` is present, it decides (`…/did/v1` gives V10, `…/did/v1.1` gives V11). Otherwise `did+json` gives V10, `application/did` gives V11, and `did+ld+json` is an error. For a low-precision type, the expected version is used, or else VUnknown (processed with v1.1 rules). Mismatches and assumptions are recorded in `ConsumeInfo`. The order is defined in `09` §4. |
 | FR-V2 | Dual consumption | Same as above | Accept all 3 media types and **normalize into a single core Document (v1.1 superset)**. The detection result is reported as `ConsumeInfo.DetectedVersion`. |
 | FR-V3 | Version-parameterized production | v1.0 §5.4/§6.3.1 | `Options.SpecVersion` selects the `@context` URL and media type (`09` §5 table). **When producing V10, `service.id` is enforced as required**; properties undefined in v1.0 produce a warning (WarnDownlevel). |
 | FR-V4 | v1.0 Resolution adapter | v1.0 §7.1/§7.2 | `resolution/compat.V10Resolver`: provides `resolveRepresentation()`, maps RFC9457 to string errors (`09` §6.1), `contentType` only on **successful** resolveRepresentation (REQUIRED if successful; in resolve it is §7.1.2 MUST NOT), the `accept` option is also MUST NOT for resolve (§7.1.1: ignore and warn), accept `hl`, reject `serviceType`. |
