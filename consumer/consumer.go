@@ -18,8 +18,9 @@
 //     a JSON-LD representation whose contexts are all known locally, terms
 //     the @context does not define are dropped ("Conforming consumers that
 //     process a JSON-LD representation SHOULD drop all terms from a DID
-//     document that are not defined via the @context"). KeepUndefinedTerms
-//     turns the drop off.
+//     document that are not defined via the @context"). Every dropped entry
+//     is reported in ConsumeInfo.DroppedTerms. KeepUndefinedTerms turns the
+//     drop off.
 //
 // The document is then built and validated for the detected version (for
 // spec.VUnknown, spec.Latest), and any violation is an error
@@ -134,6 +135,7 @@ func (c *Consumer) Consume(data []byte, mediaType string, opts representation.Co
 	if err := conforms(d, info.DetectedVersion); err != nil {
 		return nil, none, err
 	}
+	info.DroppedTerms = r.dropped
 	return d, info, nil
 }
 

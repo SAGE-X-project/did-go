@@ -1719,6 +1719,7 @@
    "scope": "in-scope",
    "reason": "",
    "owners": [
+    "resolution/compat",
     "resolver"
    ]
   },
@@ -2372,6 +2373,7 @@
    "scope": "in-scope",
    "reason": "",
    "owners": [
+    "resolution/compat",
     "dereferencer"
    ]
   },

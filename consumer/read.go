@@ -15,8 +15,9 @@ import (
 // reader turns JSON nodes into the data model by the consumption rules of
 // DID Core 1.0 §6.2.2 and DID 1.1 §6.2.2.
 type reader struct {
-	terms jsonld.Terms
-	drop  bool
+	terms   jsonld.Terms
+	drop    bool
+	dropped []string
 }
 
 // context checks the @context of a JSON-LD representation and prepares the
@@ -41,9 +42,14 @@ func (r *reader) context(root wire.Node, v spec.Version, keep bool) error {
 	return nil
 }
 
-// undefined reports whether name is a term to drop.
-func (r *reader) undefined(name string) bool {
-	return r.drop && !r.terms.Defines(name)
+// drops reports whether name, found at path, is a term to drop, and records
+// path when it is.
+func (r *reader) drops(path, name string) bool {
+	if !r.drop || r.terms.Defines(name) {
+		return false
+	}
+	r.dropped = append(r.dropped, path)
+	return true
 }
 
 func want(n wire.Node, k wire.Kind, where, statement string) error {
@@ -98,7 +104,7 @@ func (r *reader) entry(b *document.Builder, m wire.Member) error {
 	if p, err := vm.ParsePurpose(m.Name); err == nil {
 		return r.relationship(b, p, m.Value)
 	}
-	if r.undefined(m.Name) { // core properties are defined by every base context
+	if r.drops(m.Name, m.Name) { // core properties are defined by every base context
 		return nil
 	}
 	v, err := wire.ToValue(m.Value)
@@ -232,7 +238,7 @@ func (r *reader) method(n wire.Node, where string) (vm.Method, error) {
 }
 
 func (r *reader) methodMember(m *vm.Method, mem wire.Member, where string) error {
-	if r.undefined(mem.Name) {
+	if r.drops(where, mem.Name) {
 		return nil
 	}
 	var err error
@@ -311,7 +317,7 @@ func (r *reader) service(n wire.Node, where string) (vm.Service, error) {
 		case wire.PropServiceEndpoint:
 			s.ServiceEndpoint, s.EndpointShape, err = endpoints(mem.Value, at)
 		default:
-			if !r.undefined(mem.Name) { // id, type and serviceEndpoint are defined by every base context
+			if !r.drops(at, mem.Name) { // id, type and serviceEndpoint are defined by every base context
 				s.Extra = withExtra(s.Extra, mem)
 			}
 		}

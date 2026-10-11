@@ -31,6 +31,63 @@ func (r MediaRange) Matches(mediaType string) bool {
 	return (r.Type == "*" || r.Type == t) && (r.Subtype == "*" || r.Subtype == s)
 }
 
+// specificity orders matching media ranges (RFC 9110 §12.5.1: "Media
+// ranges can be overridden by more specific media ranges or specific media
+// types"): type/subtype over type/* over */*, then more parameters.
+func (r MediaRange) specificity() int {
+	s := len(r.Params)
+	if r.Type != "*" {
+		s += 1000
+	}
+	if r.Subtype != "*" {
+		s += 1000
+	}
+	return s
+}
+
+// weight returns the weight ranges give mediaType: that of the most specific
+// matching range, or -1 when no range matches.
+func weight(ranges []MediaRange, mediaType string) int {
+	best, w := -1, -1
+	for _, r := range ranges {
+		if r.Matches(mediaType) && r.specificity() > best {
+			best, w = r.specificity(), r.Weight
+		}
+	}
+	return w
+}
+
+// Negotiate returns the offer that accept prefers, following the content
+// negotiation rules of RFC 9110 §12.5.1: an offer gets the weight of the most
+// specific media range that matches it (parameters are not compared), an
+// offer whose weight is 0 or that no range matches is not acceptable, and the
+// acceptable offer with the highest weight wins, ties going to the earlier
+// offer. An accept value without any element accepts every offer, so
+// offers[0] is returned. A malformed accept value accepts nothing.
+func Negotiate(accept string, offers []string) (string, bool) {
+	ranges, err := ParseAccept(accept)
+	if err != nil || len(offers) == 0 {
+		return "", false
+	}
+	if len(ranges) == 0 {
+		return offers[0], true
+	}
+	pick, best := "", 0
+	for _, o := range offers {
+		if w := weight(ranges, o); w > best {
+			pick, best = o, w
+		}
+	}
+	return pick, best > 0
+}
+
+// Acceptable reports whether accept accepts mediaType (Negotiate with the
+// single offer mediaType).
+func Acceptable(accept, mediaType string) bool {
+	_, ok := Negotiate(accept, []string{mediaType})
+	return ok
+}
+
 // ParseAccept parses an Accept value as defined in RFC 9110 §12.5.1:
 // #( media-range [ weight ] ), where a media range is "*/*", type "/*" or
 // type "/" subtype followed by parameters, and the weight is ";q=" qvalue.
