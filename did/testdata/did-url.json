@@ -1,0 +1,19 @@
+{
+  "source": "docs/10-abnf-appendix.md §2.3, §2.4",
+  "valid": [
+    {"id": "U1", "input": "did:example:123/path/sub?versionId=1#key-1", "did": "did:example:123", "path": "/path/sub", "query": "versionId=1", "hasQuery": true, "fragment": "key-1", "hasFragment": true, "statements": ["core10#did-url-syntax.1", "did11-cr20260305#did-url-syntax.1"]},
+    {"id": "U2", "input": "did:example:123#keys-1", "did": "did:example:123", "path": "", "fragment": "keys-1", "hasFragment": true, "statements": ["core10#did-url-syntax.1", "did11-cr20260305#did-url-syntax.1"]},
+    {"id": "U3", "input": "did:example:123?service=agent&relativeRef=/credentials#degree", "did": "did:example:123", "path": "", "query": "service=agent&relativeRef=/credentials", "hasQuery": true, "fragment": "degree", "hasFragment": true, "statements": ["core10#did-url-syntax.1", "did11-cr20260305#did-url-syntax.1"]},
+    {"id": "U4", "input": "did:example:123?versionTime=2021-05-10T17:00:00Z", "did": "did:example:123", "path": "", "query": "versionTime=2021-05-10T17:00:00Z", "hasQuery": true, "statements": ["core10#did-url-syntax.1", "did11-cr20260305#did-url-syntax.1"]},
+    {"id": "U5", "input": "did:example:123?hl=zQmWvQxTqbG2Z9HPJgG57jjwR154cKhbtJenbyYTWkjgF3e", "did": "did:example:123", "path": "", "query": "hl=zQmWvQxTqbG2Z9HPJgG57jjwR154cKhbtJenbyYTWkjgF3e", "hasQuery": true, "statements": ["core10#did-url-syntax.1", "did11-cr20260305#did-url-syntax.1"]},
+    {"id": "U7", "input": "did:example:123/", "did": "did:example:123", "path": "/", "statements": ["core10#did-url-syntax.1", "did11-cr20260305#did-url-syntax.1"]}
+  ],
+  "relative": [
+    {"id": "U6", "ref": "#key-1", "base": "did:example:123", "want": "did:example:123#key-1", "statements": ["core10#relative-did-urls.2", "did11-cr20260305#relative-did-urls.2"]}
+  ],
+  "invalid": [
+    {"id": "IU1", "input": "did:example:123##frag", "pos": 16, "statements": ["core10#did-url-syntax.1", "did11-cr20260305#did-url-syntax.1"]},
+    {"id": "IU2", "input": "did:example:123?q=^v", "pos": 18, "statements": ["core10#did-url-syntax.1", "did11-cr20260305#did-url-syntax.1"]},
+    {"id": "IU3", "input": "did:EXAMPLE:123/path", "pos": 4, "statements": ["core10#did-url-syntax.1", "did11-cr20260305#did-url-syntax.1"]}
+  ]
+}

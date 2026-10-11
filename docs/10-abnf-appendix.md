@@ -47,7 +47,7 @@ HEXDIG        = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
 **Implementation notes**
 - `method-specific-id` allows a multi-level structure separated by colons (`*( *idchar ":" ) 1*idchar`). However, **the last character must be an idchar** (no trailing colon, no empty msid).
 - HEXDIG in `pct-encoded`: RFC 3986 §2.1 recommends uppercase when encoding and treats case as insignificant when interpreting. The parser accepts both. Normalized output should use uppercase.
-- **Scheme case**: in RFC 5234 the string literal `"did:"` is formally case-insensitive, but every example in the specification and the test suite practice use lowercase `did:`. **This implementation accepts lowercase only** (strict). Lenient input (`DID:`) is accepted only through a normalization option (see the note case in §2.1).
+- **Scheme case** (revised 2026-10-12): in RFC 5234 §2.3 the string literal `"did:"` is case-insensitive, so `DID:example:123` is a DID by the ABNF. The standard core must not be stricter than the specifications (12 §2), so the parser **accepts the scheme in any case** and output **writes it in lowercase** (RFC 3986 §3.1: schemes compare case-insensitively and producers should emit lowercase). `method-name` stays lowercase only (`method-char = %x61-7A / DIGIT`).
 - The semicolon (`;`) is valid inside path and query as a `sub-delims` character, but its use as a DID parameter separator is reserved for the future. It triggers a warning (FR-S2).
 - In a pure DID context (subject, controller), `?` and `#` are prohibited (§Identifier Restrictions, FR-S6). Note that the `did` production itself has no path, query or fragment.
 
@@ -83,7 +83,7 @@ HEXDIG        = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
 | I9 | `example:123` | `did:` scheme is missing |
 | I10 | (subject/controller context) `did:example:123#key-1` | §Identifier Restrictions: a fragment is prohibited in a pure DID (`ErrIdentifierRestriction`) |
 
-**Note case**: `DID:example:123`. The ABNF literal is formally case-insensitive, but this implementation is strict lowercase (§1.3 implementation notes). Documented as: strict mode = I11 (fails); with the normalization option enabled, the input is lowercased and then accepted.
+**Note case**: `DID:example:123` is accepted and its string form is `did:example:123` (§1 scheme case note). It is a valid vector, not an invalid one.
 
 ### 2.3 DID URL: valid (expected component split)
 

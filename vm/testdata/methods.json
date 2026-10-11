@@ -1,0 +1,50 @@
+{
+  "source": "docs/10-abnf-appendix.md §2.6 (C1, C2, C3, C5): the verification methods of the conformance vectors",
+  "vectors": [
+    {
+      "id": "C1",
+      "valid": true,
+      "method": {
+        "id": "did:example:123456789abcdefghi#keys-1",
+        "type": "Multikey",
+        "controller": "did:example:123456789abcdefghi",
+        "publicKeyMultibase": "z6MkmM42vxfqZQsv4ehtTjFFxQ4sQKS2w6WR7emozFAn5cxu"
+      },
+      "statements": ["cid10#Multikey.9", "cid10#Multikey.10", "cid10#verification-methods.3"]
+    },
+    {
+      "id": "C2",
+      "valid": true,
+      "method": {
+        "id": "did:example:123456789abcdefghi#keys-1",
+        "type": "Ed25519VerificationKey2020",
+        "controller": "did:example:123456789abcdefghi",
+        "publicKeyMultibase": "zH3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV"
+      },
+      "statements": ["core10#verification-material.7", "core10#verification-methods.7"]
+    },
+    {
+      "id": "C3",
+      "valid": false,
+      "method": {
+        "id": "did:example:1#k1",
+        "type": "Multikey",
+        "controller": "did:example:1",
+        "publicKeyMultibase": "z6MkmM42vxfqZQsv4ehtTjFFxQ4sQKS2w6WR7emozFAn5cxu",
+        "publicKeyJwk": {"kty": "OKP", "crv": "Ed25519", "x": "AAAA"}
+      },
+      "statements": ["cid10#verification-material.1", "core10#verification-material.8"]
+    },
+    {
+      "id": "C5",
+      "valid": false,
+      "method": {
+        "id": "did:example:1#k1",
+        "type": "JsonWebKey",
+        "controller": "did:example:1",
+        "publicKeyJwk": {"kty": "OKP", "crv": "Ed25519", "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo", "d": "nWGxne_9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2A"}
+      },
+      "statements": ["cid10#JsonWebKey.4", "cid10#JsonWebKey.13", "core10#verification-material.3"]
+    }
+  ]
+}
