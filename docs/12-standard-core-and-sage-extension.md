@@ -420,7 +420,6 @@ candidate approach and has not been designed.
 The license was decided on 2026-10-12: Apache License 2.0, the same as
 sage-spec and rs-sage-core, so that any project can import `did-go`.
 
-
 - Whether `did:webvh` ships with `did:web` or waits for wider adoption.
 - Whether a general extension that reads DIDs from A2A cards is needed.
 - OPEN-1 to OPEN-5 of the sage-spec proposal. `advanced/sage` is not
