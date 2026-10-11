@@ -230,7 +230,7 @@ func TestRelativeReferences(t *testing.T) {
 		}
 	})
 	t.Run("did11-cr20260305#relative-did-urls.1 malformed references are rejected", func(t *testing.T) {
-		for _, s := range []string{"", "//host/x", "a:b", "a b", "#a#b", "%4"} {
+		for _, s := range []string{"//host/x", "a:b", "a b", "#a#b", "%4"} {
 			if _, err := ParseReference(s); err == nil {
 				t.Errorf("%q: want error", s)
 			}
@@ -270,6 +270,77 @@ func TestRelativeReferences(t *testing.T) {
 			}
 		}
 	})
+	t.Run("core10#relative-did-urls.2 RFC 3986 §5.4.1 normal examples on a DID URL base", func(t *testing.T) {
+		// RFC 3986 §5.4.1 with base http://a/b/c/d;p?q, the authority a
+		// replaced by the DID. "g:h" and "//g" change the scheme or the
+		// authority and have no DID URL counterpart other than an absolute
+		// DID URL, covered above.
+		rfcBase, err := ParseURL("did:example:a/b/c/d;p?q")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range []struct{ ref, want string }{
+			{"g", "did:example:a/b/c/g"},
+			{"./g", "did:example:a/b/c/g"},
+			{"g/", "did:example:a/b/c/g/"},
+			{"/g", "did:example:a/g"},
+			{"?y", "did:example:a/b/c/d;p?y"},
+			{"g?y", "did:example:a/b/c/g?y"},
+			{"#s", "did:example:a/b/c/d;p?q#s"},
+			{"g#s", "did:example:a/b/c/g#s"},
+			{"g?y#s", "did:example:a/b/c/g?y#s"},
+			{";x", "did:example:a/b/c/;x"},
+			{"g;x", "did:example:a/b/c/g;x"},
+			{"g;x?y#s", "did:example:a/b/c/g;x?y#s"},
+			{"", "did:example:a/b/c/d;p?q"},
+			{".", "did:example:a/b/c/"},
+			{"./", "did:example:a/b/c/"},
+			{"..", "did:example:a/b/"},
+			{"../", "did:example:a/b/"},
+			{"../g", "did:example:a/b/g"},
+			{"../..", "did:example:a/"},
+			{"../../", "did:example:a/"},
+			{"../../g", "did:example:a/g"},
+		} {
+			r, err := ParseReference(c.ref)
+			if err != nil {
+				t.Fatalf("%q: %v", c.ref, err)
+			}
+			got, err := r.Resolve(rfcBase)
+			if err != nil || got.String() != c.want {
+				t.Errorf("%q: got %q, %v; want %q", c.ref, got, err, c.want)
+			}
+		}
+	})
+	t.Run("core10#relative-did-urls.2 the empty reference resolves to the base without its fragment", func(t *testing.T) {
+		r, err := ParseReference("")
+		if err != nil || !r.IsZero() || r.IsRelative() || r.String() != "" {
+			t.Fatalf("ParseReference(\"\") = %q, %v; want the zero DIDURL", r, err)
+		}
+		for b, want := range map[string]string{
+			"did:example:123":                  "did:example:123",
+			"did:example:123#key-1":            "did:example:123",
+			"did:example:123/p?q#f":            "did:example:123/p?q",
+			"did:example:123?q=":               "did:example:123?q=",
+			"did:example:123/a/b?versionId=1#": "did:example:123/a/b?versionId=1",
+		} {
+			bu, err := ParseURL(b)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := r.Resolve(bu)
+			if err != nil || got.String() != want || got.HasFragment() {
+				t.Errorf("Resolve(%q) = %q, %v; want %q", b, got, err, want)
+			}
+		}
+		d, _ := Parse("did:example:123")
+		if u, err := ParseRef("", d); err != nil || u != d.URL() {
+			t.Errorf("ParseRef(\"\") = %q, %v; want %q", u, err, d)
+		}
+		if _, err := r.Resolve(DIDURL{}); err == nil {
+			t.Error("empty reference against the zero base: want error")
+		}
+	})
 	t.Run("did11-cr20260305#relative-did-urls.2 the DID is the authority of the base", func(t *testing.T) {
 		d, _ := Parse("did:example:123")
 		for ref, want := range map[string]string{"#key-1": "did:example:123#key-1", "g": "did:example:123/g", "?versionId=2": "did:example:123?versionId=2", "../x": "did:example:123/x"} {
@@ -285,9 +356,6 @@ func TestRelativeReferences(t *testing.T) {
 		r, _ := ParseReference("#x")
 		if _, err := r.Resolve(r); err == nil {
 			t.Fatal("relative base: want error")
-		}
-		if _, err := (DIDURL{}).Resolve(base); err == nil {
-			t.Fatal("zero reference: want error")
 		}
 	})
 }

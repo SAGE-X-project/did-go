@@ -119,7 +119,7 @@ func (u DIDURL) Query() string     // without "?"
 func (u DIDURL) HasQuery() bool    // true when "?" is present, even with an empty query
 func (u DIDURL) Fragment() string  // without "#"
 func (u DIDURL) HasFragment() bool
-func (u DIDURL) IsRelative() bool  // true when there is no DID
+func (u DIDURL) IsRelative() bool  // true when there is no DID; false for the zero value, which is also the empty reference ""
 func (u DIDURL) IsDID() bool       // true for an absolute DID URL without path, query or fragment
 func (u DIDURL) WithoutFragment() DIDURL
 func (u DIDURL) String() string
@@ -128,6 +128,7 @@ func (u DIDURL) String() string
 func ParseURL(s string) (DIDURL, error)
 
 // ParseReference parses an absolute DID URL or a relative DID URL reference. A network-path reference ("//...") would replace the DID and is rejected.
+// The empty reference "" gives the zero DIDURL, which Resolve turns into the base without its fragment (RFC 3986 §5.4.1, 10 §1).
 func ParseReference(s string) (DIDURL, error)
 
 // Resolve resolves u against an absolute base with RFC 3986 §5.2. As DID Core 1.0 §3.2.2 states, the authority is

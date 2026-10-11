@@ -5,7 +5,8 @@ import "strings"
 // DIDURL is a DID URL, did-url = did path-abempty [ "?" query ] [ "#"
 // fragment ], or a relative DID URL reference (DID Core 1.0 §3.2.2), which
 // has no DID. Path, query and fragment are kept as written, without
-// percent-decoding. The zero value is empty; IsZero reports it.
+// percent-decoding. The zero value is the empty reference "" (RFC 3986
+// §4.2 relative-ref with an empty path); IsZero reports it.
 type DIDURL struct {
 	did         DID
 	path        string
@@ -35,7 +36,10 @@ func (u DIDURL) Fragment() string { return u.fragment }
 // HasFragment reports whether a "#" is present, even with an empty fragment.
 func (u DIDURL) HasFragment() bool { return u.hasFragment }
 
-// IsRelative reports whether u is a relative reference (it has no DID).
+// IsRelative reports whether u is a relative reference (it has no DID). The
+// zero value is also the empty reference "" but reports false, so that an
+// absent DID URL is never taken for a reference to resolve; a caller that
+// accepts the empty reference checks IsZero.
 func (u DIDURL) IsRelative() bool { return u.did.IsZero() && !u.IsZero() }
 
 // IsZero reports whether u is the zero value.
@@ -88,7 +92,9 @@ func ParseURL(s string) (DIDURL, error) {
 // ParseReference parses an absolute DID URL or a relative DID URL
 // reference. A relative reference follows RFC 3986 relative-ref with a
 // path-absolute, path-noscheme or empty path; a network-path reference
-// ("//...") would replace the DID and is not supported.
+// ("//...") would replace the DID and is not supported. The empty reference
+// "" is a relative-ref of RFC 3986 §4.2 and parses to the zero DIDURL, which
+// Resolve turns into the base without its fragment (RFC 3986 §5.4.1).
 func ParseReference(s string) (DIDURL, error) {
 	if hasScheme(s) {
 		return ParseURL(s)
@@ -97,7 +103,7 @@ func ParseReference(s string) (DIDURL, error) {
 		return DIDURL{}, syntaxErr("", MaxLength, "input longer than MaxLength")
 	}
 	if s == "" {
-		return DIDURL{}, syntaxErr(s, 0, "empty reference")
+		return DIDURL{}, nil
 	}
 	if strings.HasPrefix(s, "//") {
 		return DIDURL{}, syntaxErr(s, 0, "a network-path reference cannot form a DID URL")

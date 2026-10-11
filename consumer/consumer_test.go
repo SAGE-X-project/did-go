@@ -448,3 +448,51 @@ func TestJSONLD(t *testing.T) {
 		}
 	})
 }
+
+func TestEmptyValues(t *testing.T) {
+	const v11 = `"@context":"https://www.w3.org/ns/did/v1.1","id":"did:example:1",`
+	method := func(prefix, typ, member string) string {
+		return `{` + prefix + `"verificationMethod":[{"id":"did:example:1#k","type":"` + typ + `","controller":"did:example:1",` + member + `}]}`
+	}
+	t.Run("cid10#Multikey.3 a present publicKeyMultibase is a Multibase value, not an empty string", func(t *testing.T) {
+		_, _, err := New().Consume([]byte(method(v11, "Multikey", `"publicKeyMultibase":""`)), "application/did", representation.ConsumeOptions{})
+		wantConsumerError(t, err, "cid10#Multikey.3")
+		consume(t, New(), method(v11, "Multikey", `"publicKeyMultibase":"z6MkmM42vxfqZQsv4ehtTjFFxQ4sQKS2w6WR7emozFAn5cxu"`), "application/did", representation.ConsumeOptions{})
+	})
+	t.Run("core10#verification-material.7 a present DID Core 1.0 publicKeyMultibase is not an empty string", func(t *testing.T) {
+		const v10 = `"@context":"https://www.w3.org/ns/did/v1","id":"did:example:1",`
+		c := New(KeepUndefinedTerms())
+		_, _, err := c.Consume([]byte(method(v10, "Ed25519VerificationKey2020", `"publicKeyMultibase":""`)), "application/did+ld+json", representation.ConsumeOptions{})
+		wantConsumerError(t, err, "core10#verification-material.7")
+		consume(t, c, method(v10, "Ed25519VerificationKey2020", `"publicKeyMultibase":"zH3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV"`), "application/did+ld+json", representation.ConsumeOptions{})
+	})
+	t.Run("cid10#Multikey.5 a present secretKeyMultibase is a Multibase value, not an empty string", func(t *testing.T) {
+		for _, typ := range []string{"Multikey", "JsonWebKey", "OtherType"} {
+			_, _, err := New().Consume([]byte(method(v11, typ, `"secretKeyMultibase":""`)), "application/did", representation.ConsumeOptions{})
+			wantConsumerError(t, err, "cid10#Multikey.5")
+		}
+		d, _ := consume(t, New(), method(v11, "Multikey", `"publicKeyMultibase":"z6MkmM42vxfqZQsv4ehtTjFFxQ4sQKS2w6WR7emozFAn5cxu"`), "application/did", representation.ConsumeOptions{})
+		if d.VerificationMethods()[0].SecretKeyMultibase != "" {
+			t.Fatal("cid10#Multikey.4 an absent secretKeyMultibase stays absent")
+		}
+	})
+	t.Run("cid10#JsonWebKey.3 cid10#JsonWebKey.11 an empty JWK object is not a JSON Web Key", func(t *testing.T) {
+		for member, statement := range map[string]string{`"publicKeyJwk":{}`: "cid10#JsonWebKey.3", `"secretKeyJwk":{}`: "cid10#JsonWebKey.11"} {
+			_, _, err := New().Consume([]byte(method(v11, "JsonWebKey", member)), "application/did", representation.ConsumeOptions{})
+			wantConformanceError(t, err, statement)
+		}
+	})
+	t.Run("cid10#authentication.3 cid10#verification-methods.3 the empty reference does not identify a verification method", func(t *testing.T) {
+		_, _, err := New().Consume([]byte(`{`+v11+`"authentication":[""]}`), "application/did", representation.ConsumeOptions{})
+		wantConsumerError(t, err, "cid10#authentication.3")
+		_, _, err = New().Consume([]byte(`{`+v11+`"verificationMethod":[{"id":"","type":"Multikey","controller":"did:example:1"}]}`), "application/did", representation.ConsumeOptions{})
+		wantConsumerError(t, err, "cid10#verification-methods.3")
+	})
+	t.Run("cid10#services.6 core10#services.5 a present service id is a URL or URI, not an empty string", func(t *testing.T) {
+		svc := `"service":[{"id":"","type":"Example","serviceEndpoint":"https://example.com/"}]}`
+		_, _, err := New().Consume([]byte(`{`+v11+svc), "application/did", representation.ConsumeOptions{})
+		wantConsumerError(t, err, "cid10#services.6")
+		_, _, err = New().Consume([]byte(`{"id":"did:example:1",`+svc), "application/did+json", representation.ConsumeOptions{})
+		wantConsumerError(t, err, "core10#services.5")
+	})
+}
