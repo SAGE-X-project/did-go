@@ -146,7 +146,7 @@ Rules for layer 1:
 Statements of the "conforming DID method" class constrain method
 specification authors, not this library, and are recorded as
 `out-of-scope: spec-author`. The drivers' own obligations come from the pinned
-`did:key` and `did:web` specifications (§8).
+`did:key` and `did:web` specifications (§9).
 
 ## 6. Wiring
 
