@@ -90,8 +90,16 @@ STATEMENT_OWNERS = {
     # Accepting controller documents' methods needs resolution: relying party.
     "core10#did-controller.4": ["relyingparty"],
     # Dereferencing the canonical URL and comparing the returned id is resolve.
-    "cid10#subjects.3": ["resolver"], "cid10#subjects.4": ["resolver"],
-    "cid10#subjects.5": ["resolver"],
+    "cid10#subjects.3": ["resolver"], "cid10#subjects.5": ["resolver"],
+    # The second clause ("the identifier SHOULD be treated as invalid") binds
+    # whoever receives the dereferenced document: the relying party checks
+    # the returned id against the URL it dereferenced, as the resolver does.
+    "cid10#subjects.4": ["resolver", "relyingparty"],
+    # vm checks the dateTimeStamp format; not using a method after revoked
+    # (MUST NOT) or expires (SHOULD cease) is enforced where a method is
+    # chosen for a proof: relying party.
+    "cid10#verification-methods.9": ["vm", "relyingparty"],
+    "cid10#verification-methods.11": ["vm", "relyingparty"],
     # Who may update a document is enforced when updating: DID controller.
     "cid10#controllers.4": ["controller"],
     # Steps that dereference a URL and check the fetched document run in the
