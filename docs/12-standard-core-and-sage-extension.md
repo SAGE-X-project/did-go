@@ -249,9 +249,13 @@ types it can produce through `Produces() []string`. A resolve result
 (`resolution.Result`) carries the following.
 
 - `Raw`: the bytes returned to the caller.
-- `Info`: the `representation.ConsumeInfo` obtained while consuming.
+- `Info`: the `representation.ConsumeInfo` obtained while consuming. Entries the
+  consumer dropped from a JSON-LD representation because its `@context` does not
+  define their term are listed in `Info.DroppedTerms` by location (for example
+  `service[0].bar`), so a caller can see where `Raw` and `Document` differ.
 - `Source`: the bytes the driver originally returned and their media type. It
-  is set only when the core transcoded to another representation.
+  is set only when the core produced the returned bytes itself (a transcode to
+  another representation, or re-production for `expandRelativeUrls`).
 
 Because bytes are returned, a caller can verify a signature over them, or parse
 them again, without trusting `did-go`'s re-serialization. If the core
@@ -263,8 +267,8 @@ the metadata of a deactivated result is validated too. The checks are the
 following, and any violation is returned as `INVALID_DID_DOCUMENT`. Of the
 constraints below, those on `equivalentId`/`canonicalId`, `deactivated` and
 the datetime properties are MUSTs of DID Resolution §4.3; the type constraint
-on `Extra` values is the metadata structure rule (`07` §5, DID Core 1.0
-§7.3). The spec does not
+on `Extra` values is the metadata structure rule (`07` §5, DID Resolution
+§7). The spec does not
 require a resolver to validate driver metadata, and it does not say which
 error reports a violation. Validating it, returning a violation as
 `INVALID_DID_DOCUMENT`, and doing this before the `deactivated` check are
@@ -281,14 +285,24 @@ did-go policy.
 - `created`, `updated` and `nextUpdate` are values that can be written in the
   datetime format of `07` §3. A value with sub-second precision is rejected.
   The marshaller converts to UTC (§4.3 MUST, `07` §5).
+- `versionId` and `nextVersionId` are ASCII strings (§4.3 MUST), and each
+  `proof` entry is a map.
 - Every `Extra` value is a type that a metadata structure allows (string,
   number, map, list, set, boolean, null), and so is every value nested in maps
   and lists (the metadata structure rules of `07` §5).
 
+These checks follow the DID Resolution v1.0 rules whatever document version
+was detected (`Metadata.Check(d, spec.V11)`). They run before the document is
+consumed, and the DID Resolution v1.0 metadata structure allows numbers, so
+the metadata of a driver that returns a DID Core 1.0 document may contain
+numbers. DID Core 1.0 §7.3 allows no numbers, so the DID Core 1.0 path
+(`resolution/compat`) converts every number in `Extra` and `proof` to a decimal
+string with `V10Metadata` before it returns the metadata.
+
 The resolve path works in this order.
 
-1. The core always runs `Consume` and standard validation on the bytes the
-   driver returned, using the driver's `ContentType` as the declared media
+1. Unless the result is deactivated, the core always runs `Consume` and
+   standard validation on the bytes the driver returned, using the driver's `ContentType` as the declared media
    type. If the driver labeled the bytes with a DID media type, that type
    decides the representation, and bytes that do not conform to it are
    returned as `INVALID_DID_DOCUMENT`. Content that fails standard validation,
@@ -318,7 +332,7 @@ The resolve path works in this order.
    returned as is.
    Otherwise the core checks whether it can produce an acceptable
    representation from the validated document. With the superset model and a
-   Producer that takes `SpecVersion`, the core can produce all three media
+   Producer that takes `ProduceOptions.Version`, the core can produce all three media
    types. If it can, it transcodes, keeps the driver original in `Source`, and
    returns the produced bytes. The result `contentType` then becomes the media
    type of the produced representation.
@@ -328,9 +342,10 @@ The resolve path works in this order.
    `REPRESENTATION_NOT_SUPPORTED` is defined only for the dereferencing
    `accept` option. This choice is an interpretation, and it matches the
    mapping in DIDP-05 of the sage-spec proposal. In Go it is returned as the
-   separate value `resolution.ErrAcceptNotSupported`, which has the same type.
+   error made by `resolution.NewAcceptNotSupported`. Its type is
+   `FEATURE_NOT_SUPPORTED`, and `IsAcceptNotSupported` recognizes it.
    DID Core 1.0 defines `representationNotSupported` for this case, so the v1.0
-   adapter recognizes this value and maps it to `representationNotSupported`
+   adapter recognizes this error and maps it to `representationNotSupported`
    (`09` §6.1).
 
 The SAGE profile (`advanced/sage`) is stricter. It requires an exact match on a
@@ -348,8 +363,23 @@ side effect. Users add drivers to a resolver explicitly.
 
 - Parsers bound input size and nesting depth, and reject duplicate JSON
   members and invalid UTF-8. Default limits are conservative and documented.
-- The root module performs no network I/O. Drivers that use the network take an
-  injected HTTP client and limit redirects, response size and time.
+  The implemented defaults are as follows. Consumer JSON input is limited to
+  1 MiB (`consumer.DefaultMaxBytes`) and a nesting depth of 100
+  (`consumer.DefaultMaxDepth`), changed with `consumer.WithLimits`. Depth 100
+  is above the deepest value the data model allows, so the consumer can always
+  read what the producer writes. DID and DID URL input longer than 16 KiB
+  (`did.MaxLength`) is rejected before parsing.
+- The root module opens no network connection on its own. Packages that use the
+  network use a `*http.Client` injected by the caller and limit redirects,
+  response size and time. `method/web` defaults to 3 redirects
+  (`WithMaxRedirects`), a 1 MiB response (`WithMaxResponseBytes`) and 10 seconds
+  for the whole request (`WithTimeout`, on top of the caller's context); it
+  fetches only https URLs, also after a redirect, and by default redirects must
+  stay on the same host and port (`WithCrossHostRedirects`). A client whose
+  transport skips TLS verification or allows a TLS version below 1.2 is refused,
+  and no cookies are sent or stored. The `Client` of `resolution/universal`
+  accepts only https endpoints, defaults to a 4 MiB response and 30 seconds, and
+  sends no cookies. Its `Handler` reads POST bodies up to 64 KiB.
 - No private key enters the library. Signing goes only through a signer
   callback. The `crypto` package of 05 §7 handles verification and key codecs
   only.

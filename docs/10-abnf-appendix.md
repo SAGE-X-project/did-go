@@ -48,8 +48,9 @@ HEXDIG        = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
 - `method-specific-id` allows a multi-level structure separated by colons (`*( *idchar ":" ) 1*idchar`). However, **the last character must be an idchar** (no trailing colon, no empty msid).
 - HEXDIG in `pct-encoded`: RFC 3986 §2.1 recommends uppercase when encoding and treats case as insignificant when interpreting. The parser accepts both. Normalized output should use uppercase.
 - **Scheme case** (revised 2026-10-12): in RFC 5234 §2.3 the string literal `"did:"` is case-insensitive, so `DID:example:123` is a DID by the ABNF. The standard core must not be stricter than the specifications (12 §2), so the parser **accepts the scheme in any case** and output **writes it in lowercase** (RFC 3986 §3.1: schemes compare case-insensitively and producers should emit lowercase). `method-name` stays lowercase only (`method-char = %x61-7A / DIGIT`).
-- The semicolon (`;`) is valid inside path and query as a `sub-delims` character, but its use as a DID parameter separator is reserved for the future. It triggers a warning (FR-S2).
+- The semicolon (`;`) is valid inside path and query as a `sub-delims` character, but its use as a DID parameter separator is reserved for the future (FR-S2). The parser accepts it and does not yet emit a warning.
 - In a pure DID context (subject, controller), `?` and `#` are prohibited (§Identifier Restrictions, FR-S6). Note that the `did` production itself has no path, query or fragment.
+- **Relative DID URL resolution** (FR-S3): the RFC 3986 §5.2 algorithm is used. As DID Core 1.0 §3.2.2 states, the scheme is `did`, the authority is `method-name ":" method-specific-id`, and path, query and fragment are those of the DID URL. A reference therefore changes only path, query and fragment, never the DID. Dot segments (`..`) are removed with RFC 3986 §5.2.4, so they cannot climb above the DID. A network-path reference starting with `//` would replace the authority, that is the DID, and is rejected. The path of a relative reference must be a path-absolute, a path-noscheme or an empty path of RFC 3986 §4.2 (`did.ParseReference`, `DIDURL.Resolve`).
 
 ---
 
@@ -155,14 +156,14 @@ HEXDIG        = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
 ```
 - Consumption: **detected as V10, then normalized into the single core model successfully** (FR-V2). The `Ed25519VerificationKey2020` type is not defined by CID, but consuming it is not an error (it is an extension type; if no codec is registered, it is only treated as unverifiable). Even for an unregistered type, the Multibase form check on `publicKeyMultibase` in `06` §5 still applies. The value in this vector has header `z` and a base58btc string, so it must pass.
 
-**C3: invalid, both key materials present** (CID §2.2.1 MUST NOT → `ErrKeyFormatConflict`):
+**C3: invalid, both key materials present** (CID §2.2.1 MUST NOT → `*vm.Error` from `Builder.Build`):
 ```json
 { "id": "did:example:1", "verificationMethod": [{
   "id": "did:example:1#k1", "type": "Multikey", "controller": "did:example:1",
   "publicKeyMultibase": "z6Mk…", "publicKeyJwk": {"kty": "OKP"} }] }
 ```
 
-**C4: invalid, root is not an Object**: `[ {"id": "did:example:1"} ]` → `ErrNonConforming`.
+**C4: invalid, root is not an Object**: `[ {"id": "did:example:1"} ]` → `*consumer.Error`.
 
 **C5: invalid, private member in JWK**: `publicKeyJwk: {"kty":"OKP","crv":"Ed25519","x":"…","d":"…"}` → prohibited by CID (`06` §6).
 
@@ -179,10 +180,10 @@ HEXDIG        = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
 | File | Target URL | SHA-256 | Source and status |
 |------|------------|---------|-------------------|
 | [`assets/did-v1.jsonld`](assets/did-v1.jsonld) | `https://www.w3.org/ns/did/v1` | `4f3eae5568c9c5f036a082088f9e192019ee06faa78973c87ff91d5421b88dad` | **Hash confirmed to match the official published file** (2026-07-22, identical to `curl https://www.w3.org/ns/did/v1`) |
-| [`assets/did-v1.1.jsonld`](assets/did-v1.1.jsonld) | `https://www.w3.org/ns/did/v1.1` | `ea216ecc1cb02cd39b693dba2250141e270ba0bf95890be107dd9a9e8e43de85` | Snapshot of `context/v1.1rc1` from `w3c/did@13626ba6aac9`. **Note: that URL is not yet published (300 response, CR stage).** It must be re-pinned when v1.1 is published as a REC. |
+| [`assets/did-v1.1.jsonld`](assets/did-v1.1.jsonld) | `https://www.w3.org/ns/did/v1.1` | `ea216ecc1cb02cd39b693dba2250141e270ba0bf95890be107dd9a9e8e43de85` | Equal to the SHA-256 of the base context that the pinned DID 1.1 CR (2026-03-05) gives in §6.2.4 (`did11-cr20260305#remote-resource-integrity.1`). The implementation pins this value. |
 
 - The implementation embeds these two files with `go:embed` and verifies them against the hashes above at load time (FR-R6/FR-V5, `05` §4).
-- The v1.1 value is updated when the specification is finalized, using `curl -s https://www.w3.org/ns/did/v1.1 | openssl dgst -sha256` (the check procedure in v1.1 §Remote Resource Integrity). **Until it is re-pinned, it is tracked as a release-blocking item.**
+- The v1.1 value is set by the pinned DID 1.1 publication. When a new publication (for example the REC) is pinned, the value is replaced with the one its §6.2.4 gives and the embedded file is made to match it. Tests check the copies in `jsonld/contexts/` and `spec/testdata/` against this value.
 
 ---
 

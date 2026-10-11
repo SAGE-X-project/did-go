@@ -40,6 +40,7 @@ flowchart TB
         REPR[representation]
         RES[resolution]
         METH[method]
+        MF[internal/multiformats]
     end
     subgraph LT["Tools"]
         WIRE[internal/wire]
@@ -72,7 +73,9 @@ Import rules, checked by the architecture test (§7.3):
 - Layer 0 imports only the standard library.
 - Layer 1 imports layer 0, the standard library and other layer-1 packages
   without cycles. It contains no I/O, no goroutines and no global mutable
-  state.
+  state. `internal/multiformats` is an internal helper in layer 1: pure
+  functions, using only the standard library, that encode and decode
+  Multibase, Multihash and varint values. `vm` and `document` import it.
 - Tools import layers 0 and 1 and the standard library. They are helpers, not
   roles: `internal/wire` (the property-name table and INFRA-value-to-JSON
   conversion shared by producer and consumer), `jsonld` (embedded base contexts
@@ -109,11 +112,12 @@ from `spec`; they do not define their own copies.
 | Package | Contains | Imports |
 |---|---|---|
 | `did` | `DID`, `DIDURL`, ABNF parsing, relative DID URL resolution, `DIDParameters` as parsed values. | none |
-| `vm` | `Method` (verification method), `Relationship`, `Purpose`, `Service`, `Endpoint`, the Multikey prefix table, value-level checks (06). | `did` |
-| `document` | Immutable `Document` with copy-returning accessors (`ID`, `Controllers`, `AlsoKnownAs`, `VerificationMethods`, `Relationship`, `Services`, `Extensions`, `RepresentationEntries`); `Builder` (including `Extension` and `RepresentationEntry`); INFRA `Map` and `Value`; `Metadata` (didDocumentMetadata) with its JSON encoding; `Validate(d, v spec.Version) []Finding`; the pure selector `SelectMethod(d, ref did.DIDURL, p vm.Purpose) (*vm.Method, *ConformanceError)` with the CID error codes. | `did`, `vm`, `spec` |
+| `vm` | `Method` (verification method), `Relationship`, `Purpose`, `Service`, `Endpoint`, the Multikey prefix table, value-level checks (06). | `did`, `internal/multiformats` |
+| `document` | Immutable `Document` with copy-returning accessors (`ID`, `Controllers`, `AlsoKnownAs`, `VerificationMethods`, `Relationship`, `Services`, `Extensions`, `RepresentationEntries`); `Builder` (including `Extension` and `RepresentationEntry`); INFRA `Map` and `Value`; `Metadata` (didDocumentMetadata) with its JSON encoding; `Validate(d, v spec.Version) []Finding`; the pure selector `SelectMethod(d, ref did.DIDURL, p vm.Purpose) (*vm.Method, *ConformanceError)` with the CID error codes. | `did`, `vm`, `spec`, `internal/multiformats` |
 | `representation` | Media type helpers that read `spec`; `Producer` and `Consumer` interfaces; `ProduceOptions{Version, ...}`; `ConsumeOptions{Expected, Require, Strict}`; `ConsumeInfo`, `LowPrecision`; the detection rule as a pure function (09 §4). | `spec`, `document` |
-| `resolution` | `Resolver` and `Dereferencer` interfaces; `ResolutionOptions` (including `NoCache`), `ResolutionMetadata`, `Result`, `SourceBytes`, `DereferenceOptions`, `DereferenceResult`; `Error` (RFC 9457) built by `NewError(code Code, detail string)`, with `Code` constants, `Refines`, `HTTPStatus` and `(*Error).Is` comparing types; `DocumentMetadata` as an alias of `document.Metadata`. | `did`, `document`, `representation`, `spec` |
+| `resolution` | `Resolver` and `Dereferencer` interfaces; `ResolutionOptions` (including `NoCache`), `ResolutionMetadata`, `Result`, `SourceBytes`, `DereferenceOptions`, `DereferenceResult`; `Error` (RFC 9457) built by `NewError(code Code, detail string)`, with `Code` constants, `Refines`, `HTTPStatus` and `(*Error).Is` comparing types; `DocumentMetadata` as an alias of `document.Metadata`. | `did`, `document`, `representation`, `spec`, `vm` |
 | `method` | The `Method` interface (05 §5), `ReadResult`, `ReadOptions`, create, update and deactivate options and results, `Signer{ Sign(ctx, msg) ([]byte, error); KeyID() did.DIDURL }`, errors, and an immutable `Registry` built by `NewRegistry(ms ...Method) (*Registry, error)`. | `did`, `document` |
+| `internal/multiformats` | Multibase (base58btc, base64url) encoding and decoding, Multihash and unsigned varint, as CID 1.0 §2.4, §2.5, §3.1 and §3.2 require. Pure functions with no I/O and no global mutable state. Not public API. | standard library only |
 
 Rules for layer 1:
 
@@ -175,11 +179,11 @@ SHA-256 is in [standards.md](standards.md). Each entry has:
 - `scope`: `in-scope`, or `out-of-scope` with a reason such as `spec-author`
   or `informative` (from the coverage review in [13](13-xbar-verification.md));
 - `owners`: the package paths responsible (type packages included, for example
-  `did` for conforming-DID statements);
-- `design`: the design section that restates it.
+  `did` for conforming-DID statements).
 
-When a new publication is pinned, re-extraction writes a remap file from old to
-new ids, matched on text, so that test references can be updated mechanically.
+When a new publication is pinned, a remap file from old to new ids, matched on
+text, is to be written so that test references can be updated mechanically (no
+tool does this yet).
 
 ### 7.2 Tests and vectors name requirements
 
@@ -191,7 +195,7 @@ vector files, and fails when:
 
 - an `in-scope` statement has no reference while all its owner packages exist;
 - a reference names an id that is not in the registry;
-- a statement's `textSHA256` differs from the pinned text it was written for.
+- a registry entry's `textSHA256` is not the SHA-256 of its `text`.
 
 Work proceeds statement by statement: write the failing test that names the
 statement, implement, repeat.
@@ -203,9 +207,22 @@ fails on any import the rules of §2 do not allow.
 
 ### 7.4 What is published for inspectors
 
-The exported package `conformance` provides `Requirements()` (the registry) and
-`Claims(profile)` (which statement ids are implemented for a conformance
-profile and which are answered with `FEATURE_NOT_SUPPORTED`). An inspector
+The exported package `conformance` provides `Requirements()` (the registry),
+`Profiles()` and `Claims(profile string) ([]string, error)`. For one
+conformance profile, `Claims` returns, sorted, the ids of the `in-scope`
+statements of the profile's specifications whose owner packages all exist in
+this module. This is the rule the coverage check (§7.2) uses, so every id
+returned is named by at least one test or vector. The profiles and their
+specification keys are:
+
+- `did-core-1.0`: `core10`
+- `did-1.1`: `did11-cr20260305`, `cid10`, `res10-crd20261001`
+- `did-key`: `didkey-2cc490c`
+- `did-web`: `didweb-ea423c1`
+
+An unknown profile name is an error. Whether an owner package exists is
+decided from a list of the module's packages kept in `conformance`, and a test
+checks that list against the module tree. An inspector
 extracts statements itself from the specification bytes and cross-checks the
 SHA-256, so it never trusts did-go's registry as the oracle.
 
@@ -240,6 +257,29 @@ Adding a version:
 
 Both are community drafts and can change; a new revision is pinned as a new
 key.
+
+### 9.1 Interpretations the drivers made
+
+Where the two specifications leave room or contradict themselves, the drivers decided as follows. The main decisions are also stated in the driver's package documentation.
+
+**did:key** (`method/key`, `didkey-2cc490c`):
+
+- `options.defaultContext` is the base context of the produced DID version: `https://www.w3.org/ns/did/v1` for DID Core 1.0, as the specification recommends, and `https://www.w3.org/ns/did/v1.1` for DID 1.1, whose producers must write that context first. The Context Creation Algorithm then adds the context of each method type. A representation without JSON-LD gets no `@context`.
+- The fragment of a verification method id is the multibase value, as in the specification's examples and its encryption method algorithm. The signature method algorithm says "multicodecValue", but the examples are followed.
+- The multibase value of the identifier must start with `z` (Document Creation Algorithm step 10); otherwise the error is `invalidDid`.
+- Versioned identifiers of the form `did:key:<version>:<multibase>` are accepted. The version must be a positive integer (step 9) and is 1 when absent.
+- Encryption key derivation (`WithEncryptionKeyDerivation`) is off by default. When it is on, only an Ed25519 key gets an X25519 key agreement method (`crypto.DeriveX25519`, RFC 7748 §4.1). No derivation is defined for other key types, which get none.
+- The placement of `keyAgreement` follows the algorithm over the example. The example document of the Create section has a `keyAgreement` entry, but the Document Creation Algorithm adds `keyAgreement` only when encryption key derivation is on. The signature method is referenced from `authentication`, `assertionMethod`, `capabilityInvocation` and `capabilityDelegation`.
+- A multicodec outside the specification's key table and secp256k1 keys (no standard library implementation) raise `unsupportedPublicKeyType`, which unwraps to `method.ErrNotSupported`. Every other did:key error unwraps to `method.ErrInvalidInput`, which a resolver reports as `INVALID_DID`. did:key has no versions, so `versionId` and `versionTime` are `FEATURE_NOT_SUPPORTED`, and Update and Deactivate are not supported.
+
+**did:web** (`method/web`, `didweb-ea423c1`):
+
+- 404 is `NOT_FOUND`. 410 (Gone) means the controller removed the document on purpose, which the specification calls Deactivate, so it is reported as a deactivated DID (`deactivated: true`), not as an error. Any other status is a fetch error, which a resolver reports as `INTERNAL_ERROR`.
+- `didDocumentMetadata.updated` is taken from the `Last-Modified` header, because an update is a change of the `did.json` file. `created` and `versionId` cannot be known and are omitted.
+- The document `id` must be the DID being resolved, and every DID URL in the document's `id`, `controller`, verification method, verification relationship and service positions must be an absolute DID URL (§key-material-and-document-handling, which prevents key confusion). A violation is `method.ErrInvalidDocument`, which a resolver reports as `INVALID_DID_DOCUMENT`.
+- A response labeled with a DID media type, `application/json` or `application/ld+json` keeps its label. Any other or missing label is replaced by `application/json`, and the resolver decides the representation from the payload.
+- Only https URLs are fetched, also after a redirect. The number of redirects, the response size and the request time are limited, and by default redirects must stay on the same host and port. A client that skips TLS verification is refused, and cookies are not used (values in `12` §6.3).
+- The domain must be a DNS name; IP addresses are refused. Path segments that decode to `.`, `..` or URL delimiters are refused. Create, Update and Deactivate are done by the controller on its own web server, so the driver returns `method.ErrNotSupported`.
 
 ## 10. Order of implementation
 

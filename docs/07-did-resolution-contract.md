@@ -42,7 +42,7 @@ A conforming resolver **does not change** this signature. It must implement at l
 | `versionId` | string | Selects a specific version (§DID Parameters). |
 | `versionTime` | datetime string | Latest version before the given time. |
 
-`noCache` (OPTIONAL, `#caching`) is also a resolution option. The default `false` allows caching of DID documents; `true` requests that caching is disabled and a fresh DID document is retrieved from the verifiable data registry. A resolver that denies resolution without caching MUST respond with a `FEATURE_NOT_SUPPORTED` error that makes clear that bypassing the cache was not permitted, so the client can resolve again without `noCache`. In did-go, caching belongs to `resolution/universal` (`00` §2.5), so that adapter follows this rule.
+`noCache` (OPTIONAL, `#caching`) is also a resolution option. The default `false` allows caching of DID documents; `true` requests that caching is disabled and a fresh DID document is retrieved from the verifiable data registry. A resolver that denies resolution without caching MUST respond with a `FEATURE_NOT_SUPPORTED` error that makes clear that bypassing the cache was not permitted, so the client can resolve again without `noCache`. In did-go, caching belongs to the `resolution/cache` decorator, which wraps any resolver ([`14`](14-implementation-architecture.md) §5). By default it honours `noCache`: it bypasses the cache, passes `noCache` to the inner resolver, and replaces the cached result with the fresh one. With `cache.RefuseNoCache()` it denies the request instead and returns `FEATURE_NOT_SUPPORTED` with a detail (`cache.NoCacheRefusedDetail`) that says bypassing the cache is not permitted. Failed resolutions are never cached. `resolver.DefaultResolver`, which has no cache, honours `noCache` as it is and passes it to the driver in `method.ReadOptions.NoCache`.
 
 **Outputs**
 - `didResolutionMetadata`: REQUIRED. On error it MUST be non-empty and contain `error`.
@@ -69,6 +69,8 @@ A conforming resolver **does not change** this signature. It must implement at l
 * unexpected error                     → INTERNAL_ERROR
 ```
 > **Key point:** `deactivated` is **not an error**. It is signaled by `didDocumentMetadata.deactivated=true` (+ HTTP 410).
+
+**Driver error mapping (did-go, `resolver.DefaultResolver`):** in step 5 the `method` errors a driver returns are mapped as follows. `method.ErrNotFound` is `NOT_FOUND`, `method.ErrNotSupported` (for example `versionId` on a method without versions) is `FEATURE_NOT_SUPPORTED`, `method.ErrInvalidDocument` (the document the driver obtained does not conform or its `id` is not the DID) is `INVALID_DID_DOCUMENT`, `method.ErrInvalidInput` (the DID does not follow the rules of its method) is `INVALID_DID`, and any other error is `INTERNAL_ERROR`. For example, the `did:web` driver returns HTTP 404 as `method.ErrNotFound` and 410 (Gone) as a deactivated DID (`deactivated: true`), not as an error ([`14`](14-implementation-architecture.md) §9.1).
 
 ### 1.2 resolveRepresentation()
 **Not present** in this version. Representation selection is handled by `resolve()` + the `accept` option + `didResolutionMetadata.contentType`. In the HTTP binding, putting the `accept` option value in the `Accept` header returns only the `didDocument`, in that representation. The value is not limited to `application/did`; it can be any representation the resolver accepts (§6).
@@ -140,6 +142,18 @@ Every error step (1, 3, 6e, 8) returns the error object in `dereferencingMetadat
      no id matches the fragment and no verificationRelationship is given → NOT_FOUND
      (the spec specifies no type; did-go policy)
 ```
+
+**Decisions of the did-go `dereferencer`:** where the spec leaves room, the `dereferencer` player behaves as follows.
+
+- The dereferencing options and every DID parameter are passed as resolution options (step 2). `versionId` and `versionTime` become the options of the same name; the other parameters, `verificationRelationship` and the extension options go to `Extra`. `accept` is passed only when it accepts a DID document representation, because the content of a service selection is a URI list that no resolver can produce. When the resolver answers that it cannot produce a representation acceptable to accept (`resolution.NewAcceptNotSupported`), the dereferencing error is `REPRESENTATION_NOT_SUPPORTED`.
+- The `service` parameter is matched against the service `id` after RFC 3986 §5 resolution with the DID as base (6a), and also as a fragment of the DID (`#` + value). DID Resolution Example 13 selects `#messages` with `service=messages`; this is did-go's interpretation of the example. With both `service` and `serviceType`, a service must match both.
+- A query made only of `versionId` and `versionTime` dereferences to the resolved document, as for a DID URL without path and query (step 5), because those parameters are passed as resolution options and select that version (did-go interpretation).
+- No selected service is `NOT_FOUND`. When `text/uri-list` is selected and no selected service has a string endpoint, the result is also `NOT_FOUND`. Both are did-go policy. Map endpoints are skipped, and when step 6d is reached without `relativeRef` the endpoint URLs are used unchanged.
+- A selected endpoint URL that already has a fragment is `INVALID_DID_URL` ((b) step 2). The spec names no type; did-go chose it because the fragment of the DID URL cannot be applied.
+- Media type of the content: a DID document is a `*document.Document` whose `contentType` is a representation checked with the producer. The `contentType` of fragment content (`vm.Method`, `vm.Service`, `document.Map`) is `application/ld+json` when the document representation is `application/did` or `application/did+ld+json`, and `application/json` for `application/did+json` (did-go interpretation). A URI list is a `[]string` with `contentType` `text/uri-list`.
+- A DID that is deactivated during dereferencing is not an error. There is no content, and `contentMetadata` is the document metadata of the resolution result, with `deactivated: true`.
+- A path or another query is handled by the handlers added with `dereferencer.WithResourceHandler`, in order (step 7), and is `NOT_FOUND` when no handler takes it (step 8).
+
 **Service endpoint URL construction (caveat 6, internal conflict in the spec):**
 - The normative text (`#dereferencing-algorithm-resource`) requires **RFC3986 §5 Reference Resolution** with base=endpoint and ref=`relativeRef`.
 - The worked example (`#example-dereferencing-to-service-endpoint-url`, Examples 13 and 14) shows `did:ex:123...?service=messages&relativeRef=%2Fsome%2Fpath%3Fquery#frag` + endpoint `https://example.com/messages/8377464` → `https://example.com/messages/8377464/some/path?query#frag` (path **appended**).
@@ -161,8 +175,8 @@ Support for every parameter is OPTIONAL. Values are scalar ASCII (RFC3987 §3.1)
 | `versionTime` | datetime | Latest version before the given time. MUST use the datetime format. |
 
 **datetime format** (`#datetime`): every datetime value in this spec MUST be an ASCII string that is a valid XML datetime value as defined by the VC Data Model v2.0. Timestamps used in DID Resolution MUST also be adjusted to UTC without sub-second decimal precision, for example `2020-12-20T19:17:47Z`.
-**`versionTime` input and output**: a `versionTime` value MUST use this datetime format (UTC, no sub-second precision, §3). When did-go serializes `ResolutionOptions.VersionTime` and `DIDParameters.VersionTime`, it reuses the datetime marshaller of `document.Metadata` (§5, §7), which converts to UTC and truncates to whole seconds. On input, did-go checks the form and does not correct the value. A value with an offset other than `Z`, or with sub-second precision, is rejected: `INVALID_OPTIONS` when it comes as a resolution option, `INVALID_DID_URL` when it comes as a DID URL parameter. Rejecting instead of correcting is a did-go policy.
-**query normalization**: decode unreserved octets and uppercase hex digits; do not decode reserved delimiters (`%26`/`%3D`). Duplicate parameter names are unspecified; treating them as `INVALID_DID_URL` is reasonable.
+**`versionTime` input and output**: a `versionTime` value MUST use this datetime format (UTC, no sub-second precision, §3). When did-go serializes `ResolutionOptions.VersionTime`, it uses `spec.FormatTimestamp`, the function the `document.Metadata` marshaller uses (§5, §7), which converts to UTC and truncates to whole seconds. `did.DIDParameters` only parses DID URLs and is never serialized. On input, did-go checks the form and does not correct the value. A value with an offset other than `Z`, or with sub-second precision, is rejected: `INVALID_OPTIONS` when it comes as a resolution option, `INVALID_DID_URL` when it comes as a DID URL parameter. Rejecting instead of correcting is a did-go policy.
+**query normalization**: decode unreserved octets and uppercase hex digits; do not decode reserved delimiters (`%26`/`%3D`). The spec does not cover duplicate parameter names. did-go's `DIDURL.Parameters()` reports a repeated name, a pair without `=` and an empty name as errors, and dereferencing returns them as `INVALID_DID_URL` (did-go policy).
 
 ---
 
@@ -247,16 +261,13 @@ From CID (fragment dereferencing): `INVALID_VERIFICATION_METHOD`, `INVALID_RELAT
 ```go
 package resolution
 
-const (
-    MediaTypeDID           = "application/did"
-    MediaTypeResolution    = "application/did-resolution"
-    MediaTypeDereferencing = "application/did-url-dereferencing"
-)
+// The media type strings live in spec: spec.MediaTypeDID, spec.MediaTypeDIDResolution ("application/did-resolution"),
+// spec.MediaTypeDIDURLDereferencing ("application/did-url-dereferencing"), spec.MediaTypeURIList ("text/uri-list").
 
 // Error is an RFC9457 Problem Details object.
 type Error struct {
     Type     string `json:"type"`              // "https://www.w3.org/ns/did#NOT_FOUND"
-    Title    string `json:"title"`
+    Title    string `json:"title,omitempty"`
     Status   int    `json:"status,omitempty"`  // HTTP mapping
     Detail   string `json:"detail,omitempty"`
     Instance string `json:"instance,omitempty"`
@@ -265,67 +276,76 @@ type Error struct {
     Refines  string `json:"-"`
 }
 
-// Error type URI constants (§4)
+// Error type URI prefixes (§4)
 const (
-    nsDID = "https://www.w3.org/ns/did#"
-    nsSec = "https://w3id.org/security#" // prefix of the CID §3.5 error types
+    NamespaceDID      = "https://www.w3.org/ns/did#"
+    NamespaceSecurity = "https://w3id.org/security#" // prefix of the CID §3.5 error types
 )
-var (
-    ErrInvalidDID          = &Error{Type: nsDID + "INVALID_DID", Status: 400, Title: "Invalid DID"}
-    ErrInvalidDIDURL       = &Error{Type: nsDID + "INVALID_DID_URL", Status: 400, Title: "Invalid DID URL"}
-    ErrInvalidOptions      = &Error{Type: nsDID + "INVALID_OPTIONS", Status: 400, Title: "Invalid options"}
-    ErrNotFound            = &Error{Type: nsDID + "NOT_FOUND", Status: 404, Title: "Not found"}
-    ErrReprNotSupported    = &Error{Type: nsDID + "REPRESENTATION_NOT_SUPPORTED", Status: 406, Title: "Representation not supported"}
-    ErrInvalidDIDDocument  = &Error{Type: nsDID + "INVALID_DID_DOCUMENT", Status: 500, Title: "Invalid DID document"}
-    ErrMethodNotSupported  = &Error{Type: nsDID + "METHOD_NOT_SUPPORTED", Status: 501, Title: "Method not supported"}
-    ErrFeatureNotSupported = &Error{Type: nsDID + "FEATURE_NOT_SUPPORTED", Status: 501, Title: "Feature not supported"}
-    // ErrAcceptNotSupported is used when no representation matching accept can be produced (12 §6.2 step 4). Its type is the same
-    // as FEATURE_NOT_SUPPORTED; as a separate value it lets the v1.0 adapter recognize it and map it to "representationNotSupported" (09 §6).
-    ErrAcceptNotSupported  = &Error{Type: nsDID + "FEATURE_NOT_SUPPORTED", Status: 501, Title: "Feature not supported",
-        Detail: "the representation requested by accept cannot be produced"}
-    ErrInternal            = &Error{Type: nsDID + "INTERNAL_ERROR", Status: 500, Title: "Internal error"}
-    // CID-derived errors of fragment dereferencing (§2.1(b), §4). The type is the URL that CID defines.
-    // Refines points to INVALID_DID_URL, so the HTTP binding uses 400 (did-go policy).
-    ErrInvalidVerificationMethod = &Error{Type: nsSec + "INVALID_VERIFICATION_METHOD",
-        Title: "Invalid verification method", Refines: nsDID + "INVALID_DID_URL"}
-    ErrInvalidRelationshipForVM  = &Error{Type: nsSec + "INVALID_RELATIONSHIP_FOR_VERIFICATION_METHOD",
-        Title: "Invalid relationship for verification method", Refines: nsDID + "INVALID_DID_URL"}
+
+// Code names an error type. There are no shared mutable sentinels; an error is created at each use with NewError (14 §4).
+type Code string
+const (
+    CodeInvalidDID                 Code = "INVALID_DID"
+    CodeInvalidDIDURL              Code = "INVALID_DID_URL"
+    CodeInvalidOptions             Code = "INVALID_OPTIONS"
+    CodeNotFound                   Code = "NOT_FOUND"
+    CodeRepresentationNotSupported Code = "REPRESENTATION_NOT_SUPPORTED"
+    CodeInvalidDIDDocument         Code = "INVALID_DID_DOCUMENT"
+    CodeMethodNotSupported         Code = "METHOD_NOT_SUPPORTED"
+    CodeFeatureNotSupported        Code = "FEATURE_NOT_SUPPORTED"
+    CodeInternalError              Code = "INTERNAL_ERROR"
+    // CID-derived errors of fragment dereferencing (§2.1(b), §4). The type is the URL that CID defines (NamespaceSecurity + code).
+    CodeInvalidVerificationMethod                = Code(document.CodeInvalidVerificationMethod)
+    CodeInvalidRelationshipForVerificationMethod = Code(document.CodeInvalidRelationshipForVerificationMethod)
+    // Other CID codes: CodeInvalidVerificationMethodURL, CodeInvalidControlledIdentifierDocument, CodeInvalidControlledIdentifierDocumentID
 )
+
+// NewError returns a new error whose type is code. It fills the title and the status of a binding table type.
+// A CID error points to INVALID_DID_URL with Refines, so the HTTP binding uses 400 (did-go policy).
+// A FEATURE_NOT_SUPPORTED error without detail gets one that says a requested feature is not supported (§4 SHOULD).
+func NewError(code Code, detail string) *Error
+
+// NewAcceptNotSupported is used when no representation matching accept can be produced (12 §6.2 step 4). Its type is FEATURE_NOT_SUPPORTED;
+// IsAcceptNotSupported recognizes it, so the v1.0 adapter maps it to "representationNotSupported" (09 §6).
+func NewAcceptNotSupported(accept string) *Error
+func (e *Error) IsAcceptNotSupported() bool
+func (e *Error) Is(target error) bool // true for the same type
 
 type ResolutionOptions struct {
-    Accept             string     `json:"accept,omitempty"`
-    ExpandRelativeURLs bool       `json:"expandRelativeUrls,omitempty"`
-    VersionID          string     `json:"versionId,omitempty"`
-    VersionTime        *time.Time `json:"versionTime,omitempty"`
-    Extra              map[string]any `json:"-"`
+    Accept             string
+    ExpandRelativeURLs bool
+    VersionID          string
+    VersionTime        *time.Time
+    NoCache            bool
+    Extra              map[string]any
 }
+// MarshalJSON/UnmarshalJSON read and write Extra entries as top-level members
 
-type DereferencingOptions struct {
-    Accept                   string `json:"accept,omitempty"`
-    VerificationRelationship string `json:"verificationRelationship,omitempty"`
-    Extra                    map[string]any `json:"-"`
+type DereferenceOptions struct {
+    Accept                   string
+    VerificationRelationship string
+    Extra                    map[string]any
 }
+// MarshalJSON/UnmarshalJSON read and write Extra entries as top-level members
 
 type ResolutionMetadata struct {
-    ContentType string           `json:"contentType,omitempty"`
-    Error       *Error           `json:"error,omitempty"`
-    Proof       []map[string]any `json:"proof,omitempty"`
-    Extra       map[string]any   `json:"-"`
+    ContentType string
+    Error       *Error
+    Proof       []map[string]any
+    Extra       map[string]any
 }
+// MarshalJSON/UnmarshalJSON read and write Extra entries as top-level members
 
 // DocumentMetadata is the didDocumentMetadata. Its only definition is document.Metadata below;
 // here an alias only carries the name. Method drivers fill the same type, so it is passed on without conversion.
 type DocumentMetadata = document.Metadata
 
-// DID parameters (§3), parsed from the DID URL and passed as resolve options
-type DIDParameters struct {
-    Service     string
-    ServiceType string
-    RelativeRef string
-    VersionID   string
-    VersionTime *time.Time
-    Extra       map[string]string
-}
+// The DID parameters (§3) live in package did: DIDURL.Parameters() parses them into did.DIDParameters,
+// and the dereferencer passes them as resolve options (§2.1). Extension parameters are read with Get(name) and Names().
+//   type DIDParameters struct {
+//       Service, ServiceType, RelativeRef, VersionID, HL string
+//       VersionTime time.Time // zero when absent
+//   }
 
 // Result is «didResolutionMetadata, didDocument, didDocumentMetadata» plus
 // the bytes returned (Raw), the detection result (Info) and the pre-transcoding original (Source) (12 §6.2).
@@ -333,7 +353,7 @@ type Result struct {
     Document           *document.Document
     Raw                []byte                     // bytes returned to the caller; representation is ResolutionMetadata.ContentType
     Info               representation.ConsumeInfo // detection result from consuming the driver bytes
-    Source             *SourceBytes               // set only when the core transcoded
+    Source             *SourceBytes               // set only when the core produced the returned bytes (transcoding or expandRelativeUrls)
     ResolutionMetadata ResolutionMetadata
     DocumentMetadata   DocumentMetadata
 }
@@ -349,24 +369,21 @@ type Resolver interface {
 }
 
 type Dereferencer interface {
-    Dereference(ctx context.Context, u did.DIDURL, opts DereferencingOptions) DereferenceResult // fields: 05 §6
+    Dereference(ctx context.Context, u did.DIDURL, opts DereferenceOptions) DereferenceResult // fields: 05 §6
 }
 
-// bindingStatus is the #bindings-https status code table.
-var bindingStatus = map[string]int{
-    nsDID + "INVALID_DID": 400, nsDID + "INVALID_DID_URL": 400, nsDID + "INVALID_OPTIONS": 400,
-    nsDID + "NOT_FOUND": 404, nsDID + "REPRESENTATION_NOT_SUPPORTED": 406,
-    nsDID + "INVALID_DID_DOCUMENT": 500, nsDID + "METHOD_NOT_SUPPORTED": 501,
-    nsDID + "FEATURE_NOT_SUPPORTED": 501, nsDID + "INTERNAL_ERROR": 500,
-}
+// bindingStatus looks up the #bindings-https status code table by type URL; false when the type is not in it.
+// INVALID_DID, INVALID_DID_URL, INVALID_OPTIONS 400, NOT_FOUND 404, REPRESENTATION_NOT_SUPPORTED 406,
+// INVALID_DID_DOCUMENT 500, METHOD_NOT_SUPPORTED 501, FEATURE_NOT_SUPPORTED 501, INTERNAL_ERROR 500
+func bindingStatus(typeURL string) (int, bool)
 
 // HTTP status mapping. The code fixed by the binding table comes first, and an extension cannot change it.
 // The spec leaves the code for a type not in the table to the implementation. did-go uses the code of
 // the type named by Refines, then the error's own Status, then 500 (local policy).
 func (e *Error) HTTPStatus() int {
     if e == nil { return 500 }
-    if s, ok := bindingStatus[e.Type]; ok { return s }
-    if s, ok := bindingStatus[e.Refines]; ok { return s }
+    if s, ok := bindingStatus(e.Type); ok { return s }
+    if s, ok := bindingStatus(e.Refines); ok { return s }
     if e.Status != 0 { return e.Status }
     return 500
 }

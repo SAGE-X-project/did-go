@@ -10,6 +10,7 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -288,7 +289,12 @@ func TestDocumentsAreValid(t *testing.T) {
 				// JsonWebKey methods get the CID kid and alg warnings: the
 				// did:key fragment is the multibase value and the Encode JWK
 				// Algorithm writes only the required members.
+				// DID Core 1.0 also gets the downlevel warning for the
+				// Multikey and JsonWebKey types, which its context lacks.
 				for _, finding := range document.Validate(d, vers) {
+					if vers == spec.V10 && strings.HasSuffix(finding.Property, ".type") && finding.Severity == document.SeverityWarning {
+						continue
+					}
 					if finding.Severity == document.SeverityError || f == FormatMultikey {
 						t.Errorf("%s %s %s: %v", f, v, vers, finding)
 					}
