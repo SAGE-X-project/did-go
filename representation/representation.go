@@ -59,6 +59,13 @@ type ConsumeInfo struct {
 	// UnexpectedContext is, for application/did+json input, the first
 	// @context value when it is not the DID Core 1.0 context.
 	UnexpectedContext string
+	// DroppedTerms locates, in input order, the entries a consumer dropped
+	// from a JSON-LD representation because its @context does not define
+	// their term (DID Core 1.0 §6.3.2, DID 1.1 §6.2.3: consumers "SHOULD drop
+	// all terms from a DID document that are not defined via the
+	// @context"), for example "foo" or "service[0].bar". It is nil when
+	// nothing was dropped.
+	DroppedTerms []string
 }
 
 // Consumer parses a representation with its declared media type into a

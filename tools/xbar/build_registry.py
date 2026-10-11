@@ -149,15 +149,19 @@ STATEMENT_OWNERS = {
     # Key format conversion happens in the key codecs.
     "cid10#verification-material.2": ["crypto"],
     "cid10#verification-material.3": ["crypto"],
-    # Using accept to pick a representation is the resolver's algorithm.
-    "core10#did-resolution-options.2": ["resolver"],
+    # Using accept to pick a representation is the resolver's algorithm. The
+    # DID Core 1.0 statements speak of the didDocumentStream of
+    # resolveRepresentation and of the v1.0 dereference function, which only
+    # the v1.0 adapter exposes; the adapter must pass accept on for the inner
+    # resolver or dereferencer to honour it, so both carry the obligation.
+    "core10#did-resolution-options.2": ["resolution/compat", "resolver"],
     "core10#did-resolution-options.3": ["resolution/compat"],
     "res10#did-resolution-options.3": ["resolver"],
     # The caller that parses a returned didDocument with contentType is the
     # HTTPS binding client; in-process results carry a parsed document.
     "res10#did-resolution-metadata.4": ["resolution/universal"],
     # Dereferencing obligations of the DID URL dereferencer.
-    "core10#did-url-dereferencing-options.3": ["dereferencer"],
+    "core10#did-url-dereferencing-options.3": ["resolution/compat", "dereferencer"],
     "res10#did-url-dereferencing-options.3": ["dereferencer"],
     "res10#did-url-dereferencing-options.5": ["dereferencer"],
     "res10#did-url-dereferencing-metadata.2": ["dereferencer"],

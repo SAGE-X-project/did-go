@@ -387,16 +387,24 @@ func TestJSONLD(t *testing.T) {
 	body := `"id":"did:example:1","verificationMethod":[{"id":"did:example:1#k","type":"Multikey","controller":"did:example:1","publicKeyMultibase":"z6MkmM42vxfqZQsv4ehtTjFFxQ4sQKS2w6WR7emozFAn5cxu","x":1}],` +
 		`"service":[{"id":"did:example:1#s","type":"A","serviceEndpoint":"https://a.example/","y":2}],"fooExtension":42}`
 	t.Run("did11-cr20260305#json-ld-processors.8 terms the v1.1 context does not define are dropped", func(t *testing.T) {
-		d, _ := consume(t, c, `{"@context":"https://www.w3.org/ns/did/v1.1",`+body, "application/did", representation.ConsumeOptions{})
+		d, info := consume(t, c, `{"@context":"https://www.w3.org/ns/did/v1.1",`+body, "application/did", representation.ConsumeOptions{})
 		m := d.VerificationMethods()[0]
 		if d.Extensions().Len() != 0 || m.Extra != nil || d.Services()[0].Extra != nil || m.PublicKeyMultibase == "" {
 			t.Fatalf("undefined terms kept: %v %v %v", d.Extensions().Keys(), m.Extra, d.Services()[0].Extra)
 		}
+		want := []string{"verificationMethod[0].x", "service[0].y", "fooExtension"}
+		if !reflect.DeepEqual(info.DroppedTerms, want) {
+			t.Fatalf("DroppedTerms = %v, want %v", info.DroppedTerms, want)
+		}
 	})
 	t.Run("core10#consumption-0.2 terms the v1 context does not define are dropped", func(t *testing.T) {
 		v10 := strings.Replace(body, `"x":1`, `"expires":"2030-01-01T00:00:00Z"`, 1)
-		d, _ := consume(t, c, `{"@context":"https://www.w3.org/ns/did/v1",`+v10, "application/did+ld+json", representation.ConsumeOptions{})
+		d, info := consume(t, c, `{"@context":"https://www.w3.org/ns/did/v1",`+v10, "application/did+ld+json", representation.ConsumeOptions{})
 		m := d.VerificationMethods()[0]
+		want := []string{"verificationMethod[0].publicKeyMultibase", "verificationMethod[0].expires", "service[0].y", "fooExtension"}
+		if !reflect.DeepEqual(info.DroppedTerms, want) {
+			t.Fatalf("DroppedTerms = %v, want %v", info.DroppedTerms, want)
+		}
 		if d.Extensions().Len() != 0 || m.Expires != nil || d.Services()[0].Extra != nil {
 			t.Fatal("expires, y and fooExtension are not defined by the v1 context")
 		}
@@ -405,9 +413,12 @@ func TestJSONLD(t *testing.T) {
 		}
 	})
 	t.Run("undefined terms are kept when a context is not known locally, for JSON, and with KeepUndefinedTerms", func(t *testing.T) {
-		unknown, _ := consume(t, c, `{"@context":["https://www.w3.org/ns/did/v1","https://e.example/v1"],`+body, "application/did+ld+json", representation.ConsumeOptions{})
-		plain, _ := consume(t, c, `{`+body, "application/did", representation.ConsumeOptions{})
-		kept, _ := consume(t, New(KeepUndefinedTerms()), `{"@context":"https://www.w3.org/ns/did/v1.1",`+body, "application/did", representation.ConsumeOptions{})
+		unknown, i1 := consume(t, c, `{"@context":["https://www.w3.org/ns/did/v1","https://e.example/v1"],`+body, "application/did+ld+json", representation.ConsumeOptions{})
+		plain, i2 := consume(t, c, `{`+body, "application/did", representation.ConsumeOptions{})
+		kept, i3 := consume(t, New(KeepUndefinedTerms()), `{"@context":"https://www.w3.org/ns/did/v1.1",`+body, "application/did", representation.ConsumeOptions{})
+		if i1.DroppedTerms != nil || i2.DroppedTerms != nil || i3.DroppedTerms != nil {
+			t.Fatal("DroppedTerms must be nil when nothing is dropped")
+		}
 		for name, d := range map[string]*document.Document{"unknown context": unknown, "JSON": plain, "KeepUndefinedTerms": kept} {
 			if d.Extensions().Len() != 1 || d.VerificationMethods()[0].Extra["x"] == nil || d.Services()[0].Extra["y"] == nil {
 				t.Errorf("%s: terms dropped", name)
