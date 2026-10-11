@@ -12,17 +12,19 @@ import (
 	"github.com/sage-x-project/did-go/spec"
 )
 
-// TestReadWithStandardProducer reads did:key documents in every DID media
-// type with the standard producer, which refuses JSON-LD documents holding
-// terms their @context does not define. The Context Creation Algorithm adds
-// https://www.w3.org/ns/did/v1.1, which defines the method terms, also to DID
-// Core 1.0 output, so every representation is produced.
-func TestReadWithStandardProducer(t *testing.T) {
+// TestReadWithStrictProducer reads did:key documents in every DID media
+// type with a producer made with producer.RejectUndefinedTerms, which
+// refuses JSON-LD documents holding terms their @context does not define.
+// The Context Creation Algorithm adds https://www.w3.org/ns/did/v1.1, which
+// defines the method terms, also to DID Core 1.0 output, so every
+// representation is produced.
+func TestReadWithStrictProducer(t *testing.T) {
+	strict := producer.New(producer.RejectUndefinedTerms())
 	drivers := map[string]*key.Method{
-		"Multikey":            key.New(producer.New()),
-		"JsonWebKey":          key.New(producer.New(), key.WithPublicKeyFormat(key.FormatJsonWebKey)),
-		"encryption Multikey": key.New(producer.New(), key.WithEncryptionKeyDerivation(true)),
-		"encryption JsonWebKey": key.New(producer.New(), key.WithEncryptionKeyDerivation(true),
+		"Multikey":            key.New(strict),
+		"JsonWebKey":          key.New(strict, key.WithPublicKeyFormat(key.FormatJsonWebKey)),
+		"encryption Multikey": key.New(strict, key.WithEncryptionKeyDerivation(true)),
+		"encryption JsonWebKey": key.New(strict, key.WithEncryptionKeyDerivation(true),
 			key.WithPublicKeyFormat(key.FormatJsonWebKey)),
 	}
 	d := testutil.MustDID("did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK")
