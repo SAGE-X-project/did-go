@@ -91,6 +91,16 @@ func WithoutPOST() HandlerOption {
 //     because the binding gives both rules without saying which wins.
 //   - A request that did not arrive over TLS is refused with 403 unless
 //     WithPlaintext is set.
+//   - Content is written by its Go type, so that every content type the
+//     dereferencer package returns reaches the client: a *document.Document
+//     through the producer in the representation of contentType; a
+//     vm.Method, a vm.Service or a document.Map (a fragment, whose
+//     contentType is application/ld+json or application/json) as its JSON
+//     object, without secret key material; a []string as text/uri-list
+//     lines (or a 303 when text/uri-list is asked for alone) and as a JSON
+//     array inside the complete result; []byte, string and json.RawMessage
+//     as they are; other json.Marshaler values, map[string]any and []any
+//     with encoding/json. Content of any other type is INTERNAL_ERROR.
 type Handler struct {
 	resolver resolution.Resolver
 	deref    resolution.Dereferencer

@@ -10,9 +10,11 @@ import (
 	"unicode/utf8"
 
 	"github.com/sage-x-project/did-go/document"
+	"github.com/sage-x-project/did-go/internal/wire"
 	"github.com/sage-x-project/did-go/representation"
 	"github.com/sage-x-project/did-go/resolution"
 	"github.com/sage-x-project/did-go/spec"
+	"github.com/sage-x-project/did-go/vm"
 )
 
 // dereference runs the dereferencer and writes its result.
@@ -102,10 +104,17 @@ func firstURL(content any) (string, error) {
 	return list[0], nil
 }
 
-// contentBytes serializes content in the representation named by ct.
+// contentBytes serializes content in the representation named by ct: a
+// document through the producer, a verification method, a service or a map
+// as its JSON object (the application/ld+json or application/json fragment
+// of docs/07 §2.1), a URL list as text/uri-list lines, bytes and strings as
+// they are.
 func (h *Handler) contentBytes(content any, ct string) ([]byte, error) {
 	if ct == "" {
 		return nil, fmt.Errorf("the dereferencing result has no contentType")
+	}
+	if data, ok, err := fragmentJSON(content); ok {
+		return data, err
 	}
 	switch x := content.(type) {
 	case []byte:
@@ -124,6 +133,41 @@ func (h *Handler) contentBytes(content any, ct string) ([]byte, error) {
 		return nil, fmt.Errorf("the dereferencing result has no content")
 	}
 	return nil, fmt.Errorf("content of type %T cannot be written", content)
+}
+
+// fragmentJSON writes the part of a DID document that a fragment selects
+// (dereferencer: vm.Method, vm.Service or document.Map) as its JSON object,
+// with the members a producer writes for it; secret key material is never
+// written. It reports false for other content.
+func fragmentJSON(content any) ([]byte, bool, error) {
+	var (
+		n   wire.Node
+		err error
+	)
+	switch x := content.(type) {
+	case vm.Method:
+		n, err = wire.FromMethod(x, false)
+	case *vm.Method:
+		if x == nil {
+			return nil, true, fmt.Errorf("the dereferencing result has no content")
+		}
+		n, err = wire.FromMethod(*x, false)
+	case vm.Service:
+		n, err = wire.FromService(x)
+	case *vm.Service:
+		if x == nil {
+			return nil, true, fmt.Errorf("the dereferencing result has no content")
+		}
+		n, err = wire.FromService(*x)
+	case document.Map:
+		n, err = wire.FromValue(x)
+	default:
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, true, fmt.Errorf("the content cannot be written: %w", err)
+	}
+	return wire.Encode(n), true, nil
 }
 
 // contentJSON writes content as the JSON value of a dereferencing result:

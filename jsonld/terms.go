@@ -93,10 +93,15 @@ func (c Context) Value() document.Value {
 
 // ProductionContext returns the @context to write for a JSON-LD
 // representation of version v (DID Core 1.0 §6.3.1, DID 1.1 §6.2.3): the
-// version's base context URL first, followed by the items of existing that
-// are not a DID base context, in order. The result is the JSON String of the
-// base context when nothing follows and existing was not a list; otherwise
-// it is a list. existing may be nil.
+// version's base context URL first, followed by the other items of
+// existing, in order. A leading DID base context of existing (the base
+// context of the version it was read or built as) is replaced, and the base
+// context of v is not repeated; a DID base context of another version that
+// existing names after its first item was added on purpose, as the did:key
+// Context Creation Algorithm adds https://www.w3.org/ns/did/v1.1 to a DID
+// Core 1.0 document, and is kept. The result is the JSON String of the base
+// context when nothing follows and existing was not a list; otherwise it is
+// a list. existing may be nil.
 func ProductionContext(v spec.Version, existing document.Value) (document.Value, error) {
 	p, err := spec.ProfileOf(v)
 	if err != nil {
@@ -111,9 +116,9 @@ func ProductionContext(v spec.Version, existing document.Value) (document.Value,
 		return nil, err
 	}
 	items := []document.Value{base}
-	for _, item := range c.items {
+	for i, item := range c.items {
 		if s, ok := item.(document.String); ok {
-			if _, isBase := VersionOfContext(string(s)); isBase {
+			if _, isBase := VersionOfContext(string(s)); isBase && (i == 0 || s == base) {
 				continue
 			}
 		}

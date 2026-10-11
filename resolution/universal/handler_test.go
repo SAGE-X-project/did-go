@@ -9,9 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sage-x-project/did-go/did"
 	"github.com/sage-x-project/did-go/document"
 	"github.com/sage-x-project/did-go/resolution"
 	"github.com/sage-x-project/did-go/spec"
+	"github.com/sage-x-project/did-go/vm"
 )
 
 // get sends a request to the handler server and returns the response with
@@ -452,6 +454,60 @@ func TestHandlerContentForms(t *testing.T) {
 		}
 		if resp.StatusCode != wantStatus {
 			t.Errorf("%v: %d", content, resp.StatusCode)
+		}
+	}
+}
+
+// TestHandlerFragmentForms writes the fragment content of the dereferencer
+// (vm.Method, vm.Service, document.Map) alone and inside the complete
+// result.
+func TestHandlerFragmentForms(t *testing.T) {
+	id, _ := did.ParseReference("did:example:123#k")
+	m := vm.Method{ID: id, Type: "Multikey", Controller: mustDID(t, testDID), PublicKeyMultibase: "zPub", SecretKeyMultibase: "zSec"}
+	s := vm.Service{ID: "#s", Type: []string{"A"}, ServiceEndpoint: []vm.Endpoint{{URL: "https://e.example/"}}}
+	mp, _ := document.NewMap(document.Entry{Key: "id", Value: document.String("#m")})
+	const (
+		methodBody  = `{"id":"did:example:123#k","type":"Multikey","controller":"did:example:123","publicKeyMultibase":"zPub"}`
+		serviceBody = `{"id":"#s","type":"A","serviceEndpoint":"https://e.example/"}`
+	)
+	cases := []struct {
+		name    string
+		content any
+		status  int
+		body    string
+	}{
+		{"method", m, 200, methodBody},
+		{"method pointer", &m, 200, methodBody},
+		{"nil method pointer", (*vm.Method)(nil), 500, ""},
+		{"service", s, 200, serviceBody},
+		{"service pointer", &s, 200, serviceBody},
+		{"nil service pointer", (*vm.Service)(nil), 500, ""},
+		{"map", mp, 200, `{"id":"#m"}`},
+		{"unwritable method", vm.Method{Extra: map[string]any{"x": make(chan int)}}, 500, ""},
+	}
+	for _, tc := range cases {
+		d := &fakeDereferencer{result: resolution.DereferenceResult{
+			ContentStream:         tc.content,
+			DereferencingMetadata: resolution.DereferencingMetadata{ContentType: spec.MediaTypeLDJSON},
+		}}
+		srv := tlsServer(t, NewHandler(nil, d))
+		for _, accept := range []string{spec.MediaTypeDID, spec.MediaTypeDIDURLDereferencing} {
+			resp, body := get(t, srv, "GET", DefaultPathPrefix+"did%3Aexample%3A123%23k", accept, "")
+			if resp.StatusCode != tc.status {
+				t.Errorf("%s %s: %d %s", tc.name, accept, resp.StatusCode, body)
+				continue
+			}
+			if tc.status != 200 {
+				continue
+			}
+			if accept == spec.MediaTypeDIDURLDereferencing {
+				var dr map[string]json.RawMessage
+				_ = json.Unmarshal([]byte(body), &dr)
+				body = string(dr["content"])
+			}
+			if body != tc.body || strings.Contains(body, "zSec") {
+				t.Errorf("%s %s: %s", tc.name, accept, body)
+			}
 		}
 	}
 }

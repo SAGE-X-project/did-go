@@ -1,8 +1,8 @@
 package producer
 
 import (
+	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/sage-x-project/did-go/document"
 	"github.com/sage-x-project/did-go/internal/wire"
@@ -17,21 +17,12 @@ type writer struct {
 	includeSecret bool
 }
 
-func str(s string) wire.Node { return wire.Node{Kind: wire.String, Text: s} }
+func str(s string) wire.Node { return wire.StringNode(s) }
 
 func strs(ss []string) wire.Node {
 	items := make([]wire.Node, len(ss))
 	for i, s := range ss {
 		items[i] = str(s)
-	}
-	return wire.Node{Kind: wire.Array, Items: items}
-}
-
-// shaped writes one element as itself under vm.ShapeSingle and the
-// elements as an array otherwise.
-func shaped(s vm.Shape, items []wire.Node) wire.Node {
-	if s.Resolve(len(items)) == vm.ShapeSingle {
-		return items[0]
 	}
 	return wire.Node{Kind: wire.Array, Items: items}
 }
@@ -90,7 +81,7 @@ func (w writer) controllers(root *members, d *document.Document) {
 	for i, c := range cs {
 		items[i] = str(c.String())
 	}
-	root.add(wire.PropController, shaped(shape, items))
+	root.add(wire.PropController, wire.Shaped(shape, items))
 }
 
 // coreSets writes verificationMethod, the verification relationships and
@@ -177,92 +168,26 @@ func (m *members) value(name string, v document.Value) error {
 	return nil
 }
 
+// method writes a verification method (wire.FromMethod), locating a value
+// that cannot be written under where.
 func (w writer) method(m vm.Method, where string) (wire.Node, error) {
-	var out members
-	out.add(wire.PropID, str(m.ID.String()))
-	out.add(wire.PropType, str(m.Type))
-	out.add(wire.PropController, str(m.Controller.String()))
-	if m.Expires != nil {
-		out.add(wire.PropExpires, str(spec.FormatTimestamp(*m.Expires)))
-	}
-	if m.Revoked != nil {
-		out.add(wire.PropRevoked, str(spec.FormatTimestamp(*m.Revoked)))
-	}
-	if m.PublicKeyMultibase != "" {
-		out.add(wire.PropPublicKeyMultibase, str(m.PublicKeyMultibase))
-	}
-	if err := out.json(wire.PropPublicKeyJwk, m.PublicKeyJwk, where); err != nil {
-		return wire.Node{}, err
-	}
-	if w.includeSecret {
-		if m.SecretKeyMultibase != "" {
-			out.add(wire.PropSecretKeyMultibase, str(m.SecretKeyMultibase))
-		}
-		if err := out.json(wire.PropSecretKeyJwk, m.SecretKeyJwk, where); err != nil {
-			return wire.Node{}, err
-		}
-	}
-	if err := out.extra(m.Extra, where); err != nil {
-		return wire.Node{}, err
-	}
-	return wire.Node{Kind: wire.Object, Members: out}, nil
+	n, err := wire.FromMethod(m, w.includeSecret)
+	return n, located(where, err)
 }
 
-// json writes a JSON Web Key map when it is set.
-func (m *members) json(name string, jwk map[string]any, where string) error {
-	if jwk == nil {
-		return nil
-	}
-	n, err := wire.FromAny(jwk)
-	if err != nil {
-		return errorf(where+"."+name, "", "%v", err)
-	}
-	m.add(name, n)
-	return nil
-}
-
-// extra writes additional properties sorted by name.
-func (m *members) extra(extra map[string]any, where string) error {
-	keys := make([]string, 0, len(extra))
-	for k := range extra {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	for _, k := range keys {
-		n, err := wire.FromAny(extra[k])
-		if err != nil {
-			return errorf(where+"."+k, "", "%v", err)
-		}
-		m.add(k, n)
-	}
-	return nil
-}
-
+// service writes a service (wire.FromService), locating a value that
+// cannot be written under where.
 func (w writer) service(s vm.Service, where string) (wire.Node, error) {
-	var out members
-	if s.ID != "" {
-		out.add(wire.PropID, str(s.ID))
+	n, err := wire.FromService(s)
+	return n, located(where, err)
+}
+
+// located turns a *wire.PropertyError into an *Error whose Property is the
+// full path of the value.
+func located(where string, err error) error {
+	var pe *wire.PropertyError
+	if errors.As(err, &pe) {
+		return errorf(where+"."+pe.Property, "", "%v", pe.Err)
 	}
-	types := make([]wire.Node, len(s.Type))
-	for i, t := range s.Type {
-		types[i] = str(t)
-	}
-	out.add(wire.PropType, shaped(s.TypeShape, types))
-	eps := make([]wire.Node, len(s.ServiceEndpoint))
-	for i, e := range s.ServiceEndpoint {
-		if e.Map == nil {
-			eps[i] = str(e.URL)
-			continue
-		}
-		n, err := wire.FromAny(e.Map)
-		if err != nil {
-			return wire.Node{}, errorf(fmt.Sprintf("%s.serviceEndpoint[%d]", where, i), "", "%v", err)
-		}
-		eps[i] = n
-	}
-	out.add(wire.PropServiceEndpoint, shaped(s.EndpointShape, eps))
-	if err := out.extra(s.Extra, where); err != nil {
-		return wire.Node{}, err
-	}
-	return wire.Node{Kind: wire.Object, Members: out}, nil
+	return err
 }

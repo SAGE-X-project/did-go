@@ -18,6 +18,18 @@
 // applies document.Validate for the target version and refuses any error
 // finding, which makes service.id required for DID Core 1.0 output. Secret
 // key material is left out unless ProduceOptions.IncludeSecret is set.
+//
+// Undefined terms. "A conforming producer that generates a JSON-LD
+// representation SHOULD NOT produce a DID document that contains terms not
+// defined via the @context" (DID Core 1.0 §6.3.1 production-0.5, DID 1.1
+// §6.2.3 json-ld-processors.6), and a producer "MUST serialize all entries"
+// (production-and-consumption.10). The producer satisfies both by refusing,
+// by default, to write a JSON-LD document that holds a term its @context
+// does not define, instead of dropping the entry. The check is made only
+// when every context is known locally (the DID base contexts and inline
+// maps, jsonld.Context.Terms); a context URL that is not known leaves the
+// question undecided and the document is written. JSON production is not
+// checked. AllowUndefinedTerms turns the check off.
 package producer
 
 import (
@@ -33,7 +45,7 @@ import (
 // Producer serializes DID documents. It has no mutable state and is safe for
 // concurrent use.
 type Producer struct {
-	rejectUndefined bool
+	allowUndefined bool
 }
 
 var _ representation.Producer = (*Producer)(nil)
@@ -41,18 +53,20 @@ var _ representation.Producer = (*Producer)(nil)
 // Option configures a Producer.
 type Option func(*Producer)
 
-// RejectUndefinedTerms makes JSON-LD production fail when the document holds
-// a term that its @context does not define, following "A conforming producer
-// that generates a JSON-LD representation SHOULD NOT produce a DID document
-// that contains terms not defined via the @context" (DID Core 1.0 §6.3.1,
-// DID 1.1 §6.2.3). Without it the producer writes every entry, as
-// production-and-consumption.10 requires ("MUST serialize all entries"). The
-// check applies only when every context is known locally (jsonld.Context.Terms).
-func RejectUndefinedTerms() Option {
-	return func(p *Producer) { p.rejectUndefined = true }
+// AllowUndefinedTerms makes JSON-LD production write a document even when
+// it holds a term that its @context does not define. By default such a
+// document is refused with an *Error whose Statement is
+// did11-cr20260305#json-ld-processors.6 (DID 1.1) or core10#production-0.5
+// (DID Core 1.0), following "A conforming producer that generates a JSON-LD
+// representation SHOULD NOT produce a DID document that contains terms not
+// defined via the @context". With the option every entry is written
+// unchecked, which deviates from that recommendation.
+func AllowUndefinedTerms() Option {
+	return func(p *Producer) { p.allowUndefined = true }
 }
 
-// New returns a Producer.
+// New returns a Producer. Without options it refuses JSON-LD documents
+// that hold terms their @context does not define (see AllowUndefinedTerms).
 func New(opts ...Option) *Producer {
 	p := &Producer{}
 	for _, o := range opts {
@@ -106,7 +120,7 @@ func (p *Producer) Produce(d *document.Document, opts representation.ProduceOpti
 	if err != nil {
 		return nil, "", err
 	}
-	if opts.JSONLD && p.rejectUndefined {
+	if opts.JSONLD && !p.allowUndefined {
 		if err := checkTerms(root, ctx, v); err != nil {
 			return nil, "", err
 		}
