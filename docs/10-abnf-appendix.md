@@ -109,14 +109,17 @@ HEXDIG        = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
 
 | # | Media type | `@context[0]` | Expected result |
 |---|------------|---------------|-----------------|
-| D1 | `application/did+json` | (none) | **V10** (step 2) |
-| D2 | `application/did+ld+json` | `…/did/v1` | **V10** (step 1) |
-| D3 | `application/did` | `…/did/v1` | **V10**, `Mismatch` recorded (step 1) |
-| D4 | `application/did` | `…/did/v1.1` | **V11** (step 1) |
-| D5 | `application/did` | (none) | **V11** (step 2) |
-| D6 | `application/did+json` | `…/did/v1.1` | **V11**, `Mismatch` recorded (step 1; `@context` comes before the media type). An error in Strict mode |
+| D1 | `application/did+json` | (none) | **V10** JSON (step 1) |
+| D2 | `application/did+ld+json` | `…/did/v1` | **V10** JSON-LD (step 2) |
+| D3 | `application/did` | `…/did/v1` | Error (step 3; the media type decides the representation, so a v1.0 `@context` does not fit. This is did-go's interpretation that `@context` signals JSON-LD processing (`12` §6.1). `08` T7) |
+| D4 | `application/did` | `…/did/v1.1` | **V11** (step 3) |
+| D5 | `application/did` | (none) | **V11** (step 3) |
+| D6 | `application/did+json` | `…/did/v1.1` | **V10** JSON (step 1). `@context` is kept as a representation-specific entry and `UnexpectedContext="…/did/v1.1"` is recorded. Error under Strict |
 | D7 | `application/did+ld+json` | (none) | Error (step 2, v1.0 §6.3.1) |
-| D8 | `application/json` | (none) | Without `Expected`, **VUnknown** → consumed with v1.1 rules, `Assumed` recorded (step 3). An error in Strict mode |
+| D8 | `application/json` | (none) | Without `Expected`, **VUnknown** → consumed with v1.1 rules. `Assumed` and `LowPrecision{application/json, application/did}` are recorded (step 4). An error in Strict mode |
+| D9 | `application/ld+json` | `…/did/v1` | **V10** JSON-LD, `LowPrecision{application/ld+json, application/did+ld+json}` (step 4). An error in Strict mode |
+| D10 | `application/json` | `…/did/v1.1` | **V11**, `LowPrecision{application/json, application/did}` (step 4). An error in Strict mode |
+| D11 | `text/plain` or no media type | `…/did/v1.1` | Error (step 5) |
 
 ### 2.6 Document conformance vectors
 
@@ -150,7 +153,7 @@ HEXDIG        = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
   }]
 }
 ```
-- Consumption: **detected as V10, then normalized into the single core model successfully** (FR-V2). The `Ed25519VerificationKey2020` type is not defined by CID, but consuming it is not an error (it is an extension type; if no codec is registered, it is only treated as unverifiable).
+- Consumption: **detected as V10, then normalized into the single core model successfully** (FR-V2). The `Ed25519VerificationKey2020` type is not defined by CID, but consuming it is not an error (it is an extension type; if no codec is registered, it is only treated as unverifiable). Even for an unregistered type, the Multibase form check on `publicKeyMultibase` in `06` §5 still applies. The value in this vector has header `z` and a base58btc string, so it must pass.
 
 **C3: invalid, both key materials present** (CID §2.2.1 MUST NOT → `ErrKeyFormatConflict`):
 ```json

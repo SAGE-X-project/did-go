@@ -85,10 +85,10 @@ flowchart LR
 - **Main flow:**
   1. Set the required `id` (DID).
   2. Add optional properties (`controller`, `alsoKnownAs`, `service`, `verificationMethod`, the 5 relationships).
-  3. When adding a VM, `id` (DID URL), `type` and `controller` (DID) are required; validate the key as `publicKeyMultibase` XOR `publicKeyJwk`.
+  3. When adding a VM, `id` (DID URL), `type` and `controller` (DID) are required; validate that there is at most one public key material property (`publicKeyMultibase`, `publicKeyJwk`) and at most one secret key material property. The type decides which material is used, and a VM without public key material cannot verify proofs.
   4. When adding a Service, `type` and `serviceEndpoint` (URL validated) are required; `id` is optional (if present, unique within the document; required when the production target is V10, see FR-V3).
   5. If validation passes, return an immutable DID document.
-- **Alternatives:** 3a. Both key formats present: `ErrKeyFormatConflict`. 4a. Endpoint string is not a valid URL: `ErrInvalidServiceEndpoint`.
+- **Alternatives:** 3a. Two properties for the same material (`publicKeyJwk` with `publicKeyMultibase`, or `secretKeyJwk` with `secretKeyMultibase`): `ErrKeyFormatConflict`. 4a. Endpoint string is not a valid URL: `ErrInvalidServiceEndpoint`.
 
 ### UC-3: Produce a Representation
 - **Actors:** App Developer, Controller, Resolver
@@ -106,7 +106,7 @@ flowchart LR
 - **FR:** FR-R2, FR-R3, FR-R5, FR-D7
 - **Main flow:**
   1. Input: bytes plus a media type string (accept `application/did` plus legacy `did+json`/`did+ld+json`; FR-V2).
-  2. Detect the version from the media type and `@context[0]` (FR-V1, `09` §4). Check that the root is a JSON Object.
+  2. Decide the representation and version from the declared DID media type, and look at `@context[0]` only for a low-precision type (FR-V1, `09` §4). Check that the root is a JSON Object.
   3. Classify entries: *known* representation-specific entries such as `@context` go to representation-specific-entries (rule 3); *unrecognized* non-representation-specific properties are added as data model extension properties (rule 4).
   4. If JSON-LD, drop undefined terms.
   5. Return the data model.
@@ -124,6 +124,7 @@ flowchart LR
 - **Alternatives:**
   - 2a. Parsing fails: metadata.error.type = `…#INVALID_DID` (RFC9457, `07` §4).
   - 2b. Method not registered: `…#METHOD_NOT_SUPPORTED`.
+  - 2c. Option not supported: `…#FEATURE_NOT_SUPPORTED`. Option invalid: `…#INVALID_OPTIONS`. Checked after the method lookup and before Read (`07` §1.1 steps 3 and 4). An option the driver reports with `method.ErrNotSupported` during Read (for example `versionTime`) is also `…#FEATURE_NOT_SUPPORTED`.
   - 3a. No document: `…#NOT_FOUND`. Deactivated: not an error, `didDocumentMetadata.deactivated=true`.
   - (On the v1.0 contract path, the adapter maps to string codes such as `invalidDid`/`notFound`; see UC-12.)
 
@@ -136,7 +137,9 @@ flowchart LR
   3. If there is a `fragment`, select the VM/service in the document whose `id` matches (compare after making relative DID URLs absolute).
   4. Apply service dereferencing rules (if any).
   5. Return `contentStream` + `dereferencingMetadata` + `contentMetadata`.
-- **Alternative:** 3a. No fragment match: `…#NOT_FOUND` (RFC9457).
+- **Alternatives:**
+  - 3a. No `id` matches the fragment. Without the `verificationRelationship` option the result is `https://www.w3.org/ns/did#NOT_FOUND` (RFC9457; the spec specifies no type, so this is did-go policy). With the option it is `https://w3id.org/security#INVALID_VERIFICATION_METHOD` (07 §2.1(b)).
+  - 3b. The VM found is not in the relationship array named by `verificationRelationship`. The result is `https://w3id.org/security#INVALID_RELATIONSHIP_FOR_VERIFICATION_METHOD`.
 
 ### UC-7: Create a DID
 - **Actors:** DID Controller, Method Plugin
@@ -190,7 +193,7 @@ flowchart LR
 - **FR:** FR-V1 to V5
 - **Precondition:** None (the core always accepts both versions)
 - **Main flow:**
-  1. **Consume a v1.0 document**: input with `did+json`/`did+ld+json` or `@context[0]==…/did/v1` is detected as V10 and normalized into the single core model (extension of UC-4).
+  1. **Consume a v1.0 document**: input with `did+json`/`did+ld+json`, or low-precision input with `@context[0]==…/did/v1`, is detected as V10 and normalized into the single core model (extension of UC-4).
   2. **Produce a v1.0 document**: specify `SpecVersion=V10` to serialize with the v1 context and a legacy media type. Documents without `service.id` are rejected (v1.0 §5.4 MUST).
   3. **v1.0 contract resolution**: a legacy client calls `compat.V10Resolver.resolveRepresentation()`, which performs an internal v1.1 resolve (the core transcodes to the V10 representation to match accept) and RFC9457 to string error mapping (`09` §6.1).
   4. The detected version is reported to the caller as `ConsumeInfo.DetectedVersion`.
@@ -198,6 +201,7 @@ flowchart LR
   - 2a. Target is V10 but `service.id` is missing: `ConformanceError`.
   - 3a. `serviceType` parameter used on the v1.0 path: `featureNotSupported` (string).
   - 3b. `hl` parameter: accepted by the adapter (not passed to the core, `09` §6.2).
+  - 3c. The accept representation cannot be produced: `representationNotSupported` (string, v1.0 §7.1.2). The core returns `FEATURE_NOT_SUPPORTED` as the value `resolution.ErrAcceptNotSupported`, and the adapter maps it (`09` §6.1).
 
 ---
 

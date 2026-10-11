@@ -17,6 +17,7 @@
 > 6. **serviceEndpoint URL construction conflict**: the normative text requires RFC3986 §5, but the worked example shows a result that appends the path (see §2.1).
 > 7. **Dereferencing result key names do not match**: the abstract function `dereference()` returns `dereferencingMetadata`, `contentStream` and `contentMetadata`. Example 22 in `#did-url-dereferencing-result` uses the keys `content`, `didUrlDereferencingMetadata` and `contentMetadata`. The HTTP binding example (`#example-returning-a-did-url-dereferencing-result`, Example 35) uses `content`, `dereferencingMetadata` and `contentMetadata`, and the algorithm steps mix `content` and `contentStream`. The names are inconsistent inside the specification, so this is recorded here. did-go uses `content`, `dereferencingMetadata` and `contentMetadata` in the HTTP result body (§6).
 > 8. **`contentType` location conflict for `text/uri-list` results**: the algorithm (`#dereferencing-algorithm-resource`) puts `"contentType" → "text/uri-list"` in `contentMetadata`. The HTTP binding (`#bindings-https`) requires 303 when the `contentType` in `dereferencingMetadata` is `text/uri-list`. `#did-url-content-metadata` defines no common properties at all. The binding's 303 rule reads: "The HTTP response MUST contain an Location header. The value of this header MUST be the selected DID service endpoint URL. the HTTP response body MUST be empty." did-go interprets this as follows (this is an interpretation, not spec text). On output, it writes the value into `dereferencingMetadata.contentType` for the binding and also into `contentMetadata` to follow the algorithm (in Go, `DocumentMetadata.Extra["contentType"]`). On input, it accepts the value in either place.
+> 9. **`@context` and `contentType` in the result example**: Example 21 of `#did-resolution-result` pairs a DID Core 1.0 `@context` (`https://www.w3.org/ns/did/v1`) with `contentType` `application/did`. DID Core 1.0 and DID 1.1 both require a consumer to determine the representation from the media type input (MUST), and DID 1.1 §6.2.3 requires, for production for JSON-LD processing, that the first `@context` value be `https://www.w3.org/ns/did/v1.1`. Reading the presence of `@context` in an `application/did` document as an intent to use JSON-LD processing, so that this requirement applies, is did-go's interpretation. Under that interpretation a conforming consumer must reject this combination. The example is informative, so did-go follows the normative MUST ([`12`](12-standard-core-and-sage-extension.md) §6.1, T7 in `08` §2.2).
 
 ---
 
@@ -37,9 +38,11 @@ A conforming resolver **does not change** this signature. It must implement at l
 | Property | Type | Meaning |
 |----------|------|---------|
 | `accept` | ASCII (HTTP Accept value) | Media type of the preferred DID document representation. (In the HTTP binding it is sent in the `Accept` header.) |
-| `expandRelativeUrls` | boolean | Makes relative DID URLs in the document absolute. |
+| `expandRelativeUrls` | boolean | When `true`, replaces each object `id` value and each verification relationship entry that is a relative DID URL with an absolute DID URL (§1.1 step 6). |
 | `versionId` | string | Selects a specific version (§DID Parameters). |
 | `versionTime` | datetime string | Latest version before the given time. |
+
+`noCache` (OPTIONAL, `#caching`) is also a resolution option. The default `false` allows caching of DID documents; `true` requests that caching is disabled and a fresh DID document is retrieved from the verifiable data registry. A resolver that denies resolution without caching MUST respond with a `FEATURE_NOT_SUPPORTED` error that makes clear that bypassing the cache was not permitted, so the client can resolve again without `noCache`. In did-go, caching belongs to `resolution/universal` (`00` §2.5), so that adapter follows this rule.
 
 **Outputs**
 - `didResolutionMetadata`: REQUIRED. On error it MUST be non-empty and contain `error`.
@@ -57,7 +60,10 @@ A conforming resolver **does not change** this signature. It must implement at l
      - deactivated                     → no error! didDocument=null,
                                          didDocumentMetadata{deactivated:true}
      - otherwise                       → output DID document (conforming representation)
-6. expandRelativeUrls==true → make relative DID URLs in services/VMs/relationships/extensions absolute
+6. expandRelativeUrls==true → iterate over services, VMs, verification relationships and extension-defined properties.
+     If an item is an object whose id value is a relative DID URL, or a verification relationship entry is a relative DID URL,
+     resolve it to an absolute DID URL by DID Core v1.0 §Relative DID URLs and update the document.
+     These two cases are the only values the spec says to replace
 7. success → didResolutionMetadata{contentType: representation media type}
         (the spec algorithm text puts it in didDocumentMetadata, which conflicts with §5 and the OpenAPI → caveat 4)
 * unexpected error                     → INTERNAL_ERROR
@@ -86,7 +92,10 @@ All inputs and outputs except `contentStream` must be serializable to JSON.
 | `accept` | ASCII Accept | Preferred media type of `contentStream`. |
 | `verificationRelationship` | ASCII | Relationship for which the dereferenced VM must be authorized. If the URL does not dereference to a VM, or the VM is not authorized for that relationship, an error MUST be raised. |
 
-**Outputs:** `dereferencingMetadata` (REQUIRED; contentType, error, proof), `contentStream` (on success, the resource: DID document, VM, service, or other), `contentMetadata` (didDocumentMetadata when the content is a DID document). `#did-url-content-metadata` defines no common properties for `contentMetadata`.
+**Outputs:** `dereferencingMetadata` (REQUIRED; contentType, error, proof), `contentStream` (on success, the resource: DID document, VM, service, or other), `contentMetadata` (didDocumentMetadata when the content is a DID document). `#did-url-content-metadata` defines no common properties for `contentMetadata`. In Go, the `DereferencingMetadata`, `ContentStream` and `ContentMetadata` fields of `DereferenceResult` correspond to the spec's `dereferencingMetadata`, `contentStream` and `contentMetadata` (`05` §6).
+- If dereferencing is unsuccessful, `contentStream` MUST be empty and `contentMetadata` MUST be an empty metadata structure. DID Core v1.0 §7.2 has the same two rules. In Go, `ContentStream` is nil and `ContentMetadata` is a zero-value `DocumentMetadata` with no `Extra` entries, serialized as `{}`.
+- If dereferencing is successful, `contentMetadata` MUST be a metadata structure, and it MAY be empty.
+- If dereferencing is successful, the media type of `contentStream` SHOULD be expressed in `dereferencingMetadata.contentType`. The value MUST be an ASCII string. The HTTP binding uses this value to set `Content-Type` and to decide on 303 (§6, caveat 8), so did-go sets it on every successful dereference.
 
 ### 2.1 dereference algorithm (`#dereferencing-algorithm`)
 **(a) Dereferencing the resource (`#dereferencing-algorithm-resource`)**
@@ -97,9 +106,13 @@ All inputs and outputs except `contentStream` must be serializable to JSON.
 4. separate the fragment if present
 5. no path and no query                → contentStream=DID document, contentMetadata=didDocumentMetadata
 6. service/serviceType parameters:
-     a. service→match id, serviceType→match type (relative references are normalized with RFC3986 §5 before comparison)
-     b. if relativeRef is present, resolve each string serviceEndpoint URL
-        with RFC3986 §5, base=endpoint, ref=relativeRef
+     a. service→match id, serviceType→match type. If id or the service value is a relative reference,
+        the absolute URIs MUST be resolved with RFC3986 §5 Reference Resolution and DID Core v1.0 §3.2.2
+        Relative DID URLs (base=the DID document id) and used for the match
+     b. if relativeRef is present:
+        - for each selected service, look at serviceEndpoint. If it is a map, skip the service.
+          If it is a string, add the value; if it is a set, add only its string items, to the list of selected endpoint URLs
+        - replace each URL in the list with the RFC3986 §5 resolution of base=that URL, ref=relativeRef
      c. no accept / DID document representation → return the DID document with the service array reduced to the selected services
      d. accept==text/uri-list  → content=list of selected endpoint URLs,
                                   contentMetadata{contentType:text/uri-list}
@@ -108,11 +121,15 @@ All inputs and outputs except `contentStream` must be serializable to JSON.
 7. path/query only → dereferencing defined by the method, an extension or the client
 8. cannot dereference                  → NOT_FOUND
 ```
+The spec text of step 6a (`#dereferencing-algorithm-resource`) is: "If the id property or the service DID parameter or both contain relative references, the corresponding absolute URIs MUST be resolved and used for determining the match, using the rules specified in RFC3986 Section 5: Reference Resolution and in section Relative DID URLs in Decentralized Identifiers (DIDs) v1.0." The operation is RFC 3986 §5 reference resolution. It is not §6 normalization, so comparing normalized strings does not replace it. DID Core v1.0 §3.2.2 requires the RFC3986 §5 algorithm for resolving a relative DID URL (MUST) and makes the base URI the DID of the DID subject, so the base is the `id` of the DID document being resolved. The `relativeRef` of step 6b is a separate algorithm step: it replaces each selected service endpoint URL with the result of running the RFC3986 §5 algorithm with that URL as base ("The base URI value is the selected DID service endpoint URL. The relative reference is the value of the DID parameter relativeRef.").
+
+Every error step (1, 3, 6e, 8) returns the error object in `dereferencingMetadata` together with `contentStream` = null (the step 6e text says `content: null`) and `contentMetadata` = «[ ]» (an empty map). The spec builds the list of selected endpoint URLs only inside step 6b, that is, only when `relativeRef` is present. It does not say how the list is built when step 6d is reached without `relativeRef`.
 **(b) Dereferencing the fragment (`#dereferencing-algorithm-fragment`)**
 ```
 1. DID document + verificationRelationship option → dereference the VM by fragment
      not a conforming VM     → an error MUST be raised,
                                and SHOULD convey the type INVALID_VERIFICATION_METHOD
+                               (this includes the case where no id matches the fragment)
      relationship not linked → an error MUST be raised,
                                and SHOULD convey the type
                                INVALID_RELATIONSHIP_FOR_VERIFICATION_METHOD
@@ -120,6 +137,8 @@ All inputs and outputs except `contentStream` must be serializable to JSON.
      endpoint already has a fragment → error (the spec does not specify a type)
      otherwise append the DID URL's fragment to the endpoint URL (inheritance)
 3. otherwise → rules of the resource media type (application/did → JSON-LD fragment rules)
+     no id matches the fragment and no verificationRelationship is given → NOT_FOUND
+     (the spec specifies no type; did-go policy)
 ```
 **Service endpoint URL construction (caveat 6, internal conflict in the spec):**
 - The normative text (`#dereferencing-algorithm-resource`) requires **RFC3986 §5 Reference Resolution** with base=endpoint and ref=`relativeRef`.
@@ -141,14 +160,15 @@ Support for every parameter is OPTIONAL. Values are scalar ASCII (RFC3987 §3.1)
 | `versionId` | string | A specific document version. |
 | `versionTime` | datetime | Latest version before the given time. MUST use the datetime format. |
 
-**datetime format**: UTC, no sub-second precision, for example `2020-12-20T19:17:47Z`.
+**datetime format** (`#datetime`): every datetime value in this spec MUST be an ASCII string that is a valid XML datetime value as defined by the VC Data Model v2.0. Timestamps used in DID Resolution MUST also be adjusted to UTC without sub-second decimal precision, for example `2020-12-20T19:17:47Z`.
+**`versionTime` input and output**: a `versionTime` value MUST use this datetime format (UTC, no sub-second precision, §3). When did-go serializes `ResolutionOptions.VersionTime` and `DIDParameters.VersionTime`, it reuses the datetime marshaller of `document.Metadata` (§5, §7), which converts to UTC and truncates to whole seconds. On input, did-go checks the form and does not correct the value. A value with an offset other than `Z`, or with sub-second precision, is rejected: `INVALID_OPTIONS` when it comes as a resolution option, `INVALID_DID_URL` when it comes as a DID URL parameter. Rejecting instead of correcting is a did-go policy.
 **query normalization**: decode unreserved octets and uppercase hex digits; do not decode reserved delimiters (`%26`/`%3D`). Duplicate parameter names are unspecified; treating them as `INVALID_DID_URL` is reasonable.
 
 ---
 
 ## 4. Error catalog (§errors), RFC9457
 
-`type` is a URL. Non-URL values MUST be prefixed with `https://www.w3.org/ns/did#`. `title` is short, `detail` is long.
+`type` is a URL. Non-URL values MUST be prefixed with `https://www.w3.org/ns/did#`. `title` is short, `detail` is long. For `FEATURE_NOT_SUPPORTED`, `detail` SHOULD give a longer description of the feature the resolver does not support. A `noCache` denial also uses this type (§1).
 
 **Refinement rule**: a specification that defines an error type not listed in this section may declare which type in this section it refines ("MAY declare that it refines one of the error types defined in this section"). A binding in `#bindings` can use that declaration to decide how to convey the error. did-go stores the declaration in the Go field `Error.Refines` (§7).
 
@@ -171,7 +191,7 @@ For a type not in the table, the spec says the status code "is determined by the
 
 `#errors` links `INVALID_DID_DOCUMENT` to §4.4 (`#resolving-algorithm`), but no algorithm step emits this type.
 
-From CID (fragment dereferencing): `INVALID_VERIFICATION_METHOD`, `INVALID_RELATIONSHIP_FOR_VERIFICATION_METHOD`. The algorithm says an error MUST be raised and SHOULD convey these types. The error raised when a service endpoint already has a fragment has no specified type.
+From CID (fragment dereferencing): `INVALID_VERIFICATION_METHOD`, `INVALID_RELATIONSHIP_FOR_VERIFICATION_METHOD`. The algorithm says an error MUST be raised and SHOULD convey these types. The error raised when a service endpoint already has a fragment has no specified type. did-go conveys these two CID errors with the type URLs CID defines (`https://w3id.org/security#INVALID_VERIFICATION_METHOD`, `https://w3id.org/security#INVALID_RELATIONSHIP_FOR_VERIFICATION_METHOD`, CID §3.5) and sets `Refines` to `https://www.w3.org/ns/did#INVALID_DID_URL`, so the HTTP binding returns them as 400. This refinement declaration is a did-go policy, not a spec requirement.
 **`deactivated` is not an error** → metadata `deactivated:true` + HTTP **410**.
 
 ---
@@ -200,7 +220,9 @@ From CID (fragment dereferencing): `INVALID_VERIFICATION_METHOD`, `INVALID_RELAT
 | `canonicalId` | single DID | MAY. A single canonical DID from the same method. Expected to be used as the primary identifier. |
 | `proof` | set of maps | Method-**specific** proof. |
 
-**Metadata structure rules**: a map with string keys; values are string/number/map/list/set/boolean/null. Must be serializable to JSON per INFRA. Non-integers and integers larger than 32 bits should be serialized as strings.
+`created`, `updated` and `nextUpdate` all follow the datetime format of §3. DID Core v1.0 §7.1.3 also says `updated` and `nextUpdate` MUST follow the same formatting rules as `created`. The default JSON encoding of Go's `*time.Time` is RFC3339Nano, which can emit sub-second digits and a non-UTC offset, so `DocumentMetadata` has a custom marshaller that converts to UTC and truncates to whole seconds (§7).
+
+**Metadata structure rules**: a map with string keys; values are string/number/map/list/set/boolean/null, and so are the values inside maps and lists. This rule is from DID Resolution v1.0 CRD. DID Core v1.0 does not allow number (for the v1.0 path see [`09`](09-v1.0-compat.md) §6). The entire metadata structure MUST be serializable according to the JSON serialization rules of INFRA. Non-integers and integers larger than 32 bits should be serialized as strings.
 
 ---
 
@@ -216,6 +238,7 @@ From CID (fragment dereferencing): `INVALID_VERIFICATION_METHOD`, `INVALID_RELAT
 - **Content-Type of a 200 response**: when resolve succeeds and returns only `didDocument`, the response MUST contain a `Content-Type` header, and its value MUST equal `didResolutionMetadata.contentType`. The body is the `didDocument` in that representation. The same applies when dereference returns a `contentStream` other than `text/uri-list`; then the reference value is `dereferencingMetadata.contentType`.
 - **303 response**: when dereference succeeds and `dereferencingMetadata.contentType` is `text/uri-list`, the status code MUST be 303. The `Location` header value MUST be the selected service endpoint URL, and the body MUST be empty. For the `contentType` location conflict, see caveat 8.
 - **Status codes**: 200 success / 303 (text/uri-list) / 400 / 404 / 406 / 410 (deactivated in `didDocumentMetadata` or `contentMetadata`) / 500 / 501. An error type not in the table gets a status chosen by the implementation. See the table in §4.
+- **Remote binding and proxied resolution** (`#resolver-architectures`, `#resolver-architectures-proxied`, AT RISK): when `resolution/universal` calls another resolver over a remote binding, it SHOULD use a trusted resolver instance, ideally one the client controls itself (for example self-hosted), and SHOULD use a secure channel such as a VPN and/or TLS with mutual authentication. did-go does not hard-code an upstream resolver address; the caller configures it. When it returns a result from an upstream resolver, `resolution/universal` is the downstream resolver, so it SHOULD pass through all upstream DID resolution metadata and DID document metadata transparently, including any proofs, and MAY add its own resolution metadata about the proxied resolution process. If the 12 §6.2 transcoding changes the `contentType` of the returned bytes, the upstream bytes and media type are kept in `Source`.
 
 ---
 
@@ -243,7 +266,10 @@ type Error struct {
 }
 
 // Error type URI constants (§4)
-const nsDID = "https://www.w3.org/ns/did#"
+const (
+    nsDID = "https://www.w3.org/ns/did#"
+    nsSec = "https://w3id.org/security#" // prefix of the CID §3.5 error types
+)
 var (
     ErrInvalidDID          = &Error{Type: nsDID + "INVALID_DID", Status: 400, Title: "Invalid DID"}
     ErrInvalidDIDURL       = &Error{Type: nsDID + "INVALID_DID_URL", Status: 400, Title: "Invalid DID URL"}
@@ -253,7 +279,17 @@ var (
     ErrInvalidDIDDocument  = &Error{Type: nsDID + "INVALID_DID_DOCUMENT", Status: 500, Title: "Invalid DID document"}
     ErrMethodNotSupported  = &Error{Type: nsDID + "METHOD_NOT_SUPPORTED", Status: 501, Title: "Method not supported"}
     ErrFeatureNotSupported = &Error{Type: nsDID + "FEATURE_NOT_SUPPORTED", Status: 501, Title: "Feature not supported"}
+    // ErrAcceptNotSupported is used when no representation matching accept can be produced (12 §6.2 step 4). Its type is the same
+    // as FEATURE_NOT_SUPPORTED; as a separate value it lets the v1.0 adapter recognize it and map it to "representationNotSupported" (09 §6).
+    ErrAcceptNotSupported  = &Error{Type: nsDID + "FEATURE_NOT_SUPPORTED", Status: 501, Title: "Feature not supported",
+        Detail: "the representation requested by accept cannot be produced"}
     ErrInternal            = &Error{Type: nsDID + "INTERNAL_ERROR", Status: 500, Title: "Internal error"}
+    // CID-derived errors of fragment dereferencing (§2.1(b), §4). The type is the URL that CID defines.
+    // Refines points to INVALID_DID_URL, so the HTTP binding uses 400 (did-go policy).
+    ErrInvalidVerificationMethod = &Error{Type: nsSec + "INVALID_VERIFICATION_METHOD",
+        Title: "Invalid verification method", Refines: nsDID + "INVALID_DID_URL"}
+    ErrInvalidRelationshipForVM  = &Error{Type: nsSec + "INVALID_RELATIONSHIP_FOR_VERIFICATION_METHOD",
+        Title: "Invalid relationship for verification method", Refines: nsDID + "INVALID_DID_URL"}
 )
 
 type ResolutionOptions struct {
@@ -277,18 +313,9 @@ type ResolutionMetadata struct {
     Extra       map[string]any   `json:"-"`
 }
 
-type DocumentMetadata struct {
-    Created       *time.Time       `json:"created,omitempty"`
-    Updated       *time.Time       `json:"updated,omitempty"`
-    Deactivated   bool             `json:"deactivated,omitempty"`
-    NextUpdate    *time.Time       `json:"nextUpdate,omitempty"`
-    VersionID     string           `json:"versionId,omitempty"`
-    NextVersionID string           `json:"nextVersionId,omitempty"`
-    EquivalentID  []string         `json:"equivalentId,omitempty"`
-    CanonicalID   string           `json:"canonicalId,omitempty"`
-    Proof         []map[string]any `json:"proof,omitempty"`
-    Extra         map[string]any   `json:"-"`
-}
+// DocumentMetadata is the didDocumentMetadata. Its only definition is document.Metadata below;
+// here an alias only carries the name. Method drivers fill the same type, so it is passed on without conversion.
+type DocumentMetadata = document.Metadata
 
 // DID parameters (§3), parsed from the DID URL and passed as resolve options
 type DIDParameters struct {
@@ -322,7 +349,7 @@ type Resolver interface {
 }
 
 type Dereferencer interface {
-    Dereference(ctx context.Context, u did.DIDURL, opts DereferencingOptions) (content any, deref ResolutionMetadata, contentMeta DocumentMetadata)
+    Dereference(ctx context.Context, u did.DIDURL, opts DereferencingOptions) DereferenceResult // fields: 05 §6
 }
 
 // bindingStatus is the #bindings-https status code table.
@@ -345,13 +372,35 @@ func (e *Error) HTTPStatus() int {
 }
 ```
 
+The Go type for `didDocumentMetadata` is defined once, in package `document`. Both `method` and `resolution` import `document`, so the resolver can return the value a driver filled in without conversion. `method` does not import `resolution`, so there is no import cycle. A driver can set every property in the §5 table.
+
+```go
+package document // metadata.go
+
+// Metadata is the didDocumentMetadata of DID Resolution §4.3 (§5 table).
+// A custom MarshalJSON converts Created, Updated and NextUpdate to UTC,
+// truncates them to whole seconds and writes them as "2020-12-20T19:17:47Z" (§3, §5).
+type Metadata struct {
+    Created       *time.Time       `json:"created,omitempty"`
+    Updated       *time.Time       `json:"updated,omitempty"`
+    Deactivated   bool             `json:"deactivated,omitempty"`
+    NextUpdate    *time.Time       `json:"nextUpdate,omitempty"`
+    VersionID     string           `json:"versionId,omitempty"`
+    NextVersionID string           `json:"nextVersionId,omitempty"`
+    EquivalentID  []string         `json:"equivalentId,omitempty"`
+    CanonicalID   string           `json:"canonicalId,omitempty"`
+    Proof         []map[string]any `json:"proof,omitempty"`
+    Extra         map[string]any   `json:"-"` // properties not listed above (extensions)
+}
+```
+
 **Core implementation rules (to be covered by tests):**
 1. The `resolve`/`dereference` signatures do not change (conforming path).
-2. `error` is an RFC9457 object with `type`=`https://www.w3.org/ns/did#<CODE>`.
+2. `error` is an RFC9457 object. Its `type` is `https://www.w3.org/ns/did#<CODE>` for DID Resolution errors and `https://w3id.org/security#<NAME>` for CID-derived errors (§4).
 3. `deactivated` is not an error → metadata + HTTP 410.
 4. When dereferencing, pass DID parameters as resolve options.
 5. Service endpoint URL = RFC3986 §5 (base=endpoint, ref=relativeRef) + fragment inheritance. Reject if the endpoint already has a fragment.
 6. HTTP: GET is required, `accept`=Accept header, other options go in the query or body. Follow the status code mapping. The `Content-Type` of a 200 response must equal the `contentType` in the metadata.
 7. `text/uri-list` dereferencing → 303. `Location` is the selected service endpoint URL and the body is empty. Write `contentType` into both `dereferencingMetadata` and `contentMetadata`, and accept it from either on input (caveat 8).
 8. The HTTP status is looked up first in the binding table by `Type`. If the type is not in the table, the table code of the type named by `Refines` is used, then the error's `Status`, and finally 500. An extension cannot change a code the table fixes. The steps from `Refines` on are did-go local policy.
-9. On the resolve path the core always consumes the driver bytes with the driver's `ContentType` and runs standard validation. A failure is `INVALID_DID_DOCUMENT`. The result `contentType` comes from the detected representation; `accept` is matched with RFC 9110 rules, and the core transcodes when needed. If no acceptable representation can be produced, the result is `FEATURE_NOT_SUPPORTED` ([`12`](12-standard-core-and-sage-extension.md) §6.2).
+9. On the resolve path the core always consumes the driver bytes with the driver's `ContentType` and runs standard validation. A failure is `INVALID_DID_DOCUMENT`. If the driver labeled the bytes with a DID media type, that type decides the representation, and bytes that do not conform to it are `INVALID_DID_DOCUMENT`. If the driver used a low-precision type, the payload decides the representation. `accept` is matched with RFC 9110 rules, and the core transcodes when needed. The result `contentType` is the media type of the bytes actually returned in `Result.Raw`, because the spec defines `contentType` as the media type of the returned `didDocument` and the caller MUST use it to parse (§5). So when the driver bytes are returned it is the DID media type the driver labeled them with, or, for a low-precision label, the precise DID media type of the detected representation. When the core transcoded, it is the DID media type of the representation the core produced. If no acceptable representation can be produced, the result is `FEATURE_NOT_SUPPORTED` ([`12`](12-standard-core-and-sage-extension.md) §6.2).

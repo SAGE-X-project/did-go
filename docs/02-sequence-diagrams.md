@@ -44,8 +44,8 @@ sequenceDiagram
     Dev->>B: NewBuilder(did)
     Dev->>B: AddVerificationMethod(vm)
     B->>Val: check vm.id is DID-URL, controller is DID
-    B->>Val: check publicKeyMultibase XOR publicKeyJwk
-    alt both key formats present
+    B->>Val: at most one public key material property, at most one secret key material property (type decides material, no public key material means no proof verification)
+    alt two or more properties for the same material
         Val-->>B: ErrKeyFormatConflict
         B-->>Dev: error
     else ok
@@ -99,14 +99,14 @@ sequenceDiagram
     participant JSON as json decoder
 
     Verifier->>Cons: Consume(bytes, mediaType)  %% application/did | did+json | did+ld+json
-    Cons->>Cons: record the declared media type (09 §4)
+    Cons->>Cons: select the representation from the declared media type. Any other type, or none, is an error (09 §4)
     Cons->>JSON: decode root
     alt root is not a JSON Object
         JSON-->>Cons: not object
         Cons-->>Verifier: ErrNonConforming
     else
         JSON-->>Cons: object
-        Cons->>Cons: settle version: @context[0] first (…/v1→V10, …/v1.1→V11), else did+json→V10, did→V11, low-precision→Expected or VUnknown (09 §4 steps 1 to 4)
+        Cons->>Cons: settle version: the DID media type decides (did+json, did+ld+json→V10, did→V11). For did+ld+json and did, a @context that does not fit the type is an error. A non-v1 @context on did+json is recorded in UnexpectedContext (error under Strict). Low-precision→@context[0], else Expected or VUnknown (09 §4 steps 1 to 5)
         Cons->>Cons: map JSON types → data model (normalize into the single v1.1 superset model)
         Cons->>Cons: known repr-specific (@context etc.) → representation-specific-entries (rule 3)
         Cons->>Cons: unrecognized non-repr entries → data-model extension properties (rule 4)
@@ -114,7 +114,7 @@ sequenceDiagram
             Cons->>Cons: JSON-LD: drop undefined terms (against the context of the detected version)
         end
         Cons->>Cons: validate conformance
-        Cons-->>Verifier: Document + ConsumeInfo{DetectedVersion, Mismatch, Assumed}
+        Cons-->>Verifier: Document + ConsumeInfo{DetectedVersion, LowPrecision, Assumed, UnexpectedContext}
     end
 ```
 
@@ -143,22 +143,42 @@ sequenceDiagram
             R-->>Verifier: null, meta{error.type=…#METHOD_NOT_SUPPORTED}, {}
         else
             Reg-->>R: Method
-            R->>M: Read(did, options)
-            M->>VDR: fetch state
-            VDR-->>M: raw record
-            M->>M: verify authenticity of response
-            alt not found
-                M-->>R: ErrNotFound
-                R-->>Verifier: null, meta{error.type=…#NOT_FOUND}, {}
-            else deactivated (not an error)
-                M-->>R: docMeta{deactivated:true}
-                R-->>Verifier: null, meta{}, docMeta{deactivated:true}
-            else ok
-                M-->>R: ReadResult{Data, ContentType}, docMeta{versionId,updated}
-                R->>Cons: Consume(Data, ContentType)
-                Cons-->>R: Document + ConsumeInfo (INVALID_DID_DOCUMENT on failure)
-                R->>R: contentType from the detected representation, accept negotiation, transcode if needed (12 §6.2)
-                R-->>Verifier: Result{doc, Raw, Info, Source, resolutionMeta{contentType}, docMeta}
+            R->>R: check options (07 §1.1 steps 3 and 4)
+            alt unsupported option
+                R-->>Verifier: null, meta{error.type=…#FEATURE_NOT_SUPPORTED}, {}
+            else invalid option
+                R-->>Verifier: null, meta{error.type=…#INVALID_OPTIONS}, {}
+            else options supported and valid
+                R->>M: Read(did, options)
+                M->>VDR: fetch state
+                VDR-->>M: raw record
+                M->>M: verify authenticity of response
+                alt not found
+                    M-->>R: ErrNotFound
+                    R-->>Verifier: null, meta{error.type=…#NOT_FOUND}, {}
+                else driver does not support an option (for example versionTime)
+                    M-->>R: ErrNotSupported
+                    R-->>Verifier: null, meta{error.type=…#FEATURE_NOT_SUPPORTED}, {}
+                else other driver error
+                    M-->>R: error
+                    R-->>Verifier: null, meta{error.type=…#INTERNAL_ERROR}, {}
+                else driver metadata violation (checked before deactivated, 12 §6.2)
+                    M-->>R: ReadResult{Metadata (equivalentId etc. violate the DID Resolution §4.3 constraints)}
+                    R-->>Verifier: null, meta{error.type=…#INVALID_DID_DOCUMENT}, {}
+                else deactivated (not an error)
+                    M-->>R: ReadResult{Metadata{deactivated:true}}
+                    R-->>Verifier: null, meta{}, docMeta{deactivated:true}
+                else ok
+                    M-->>R: ReadResult{Data, ContentType, Metadata{versionId,updated}}
+                    R->>Cons: Consume(Data, ContentType)
+                    Cons-->>R: Document + ConsumeInfo (INVALID_DID_DOCUMENT on failure)
+                    R->>R: accept negotiation, transcode if needed. contentType is the media type of the bytes returned in Raw: for driver bytes the driver's DID media type (for low-precision, the precise type of the detected representation), after transcoding the produced type (12 §6.2)
+                    alt no acceptable representation can be produced (ErrAcceptNotSupported)
+                        R-->>Verifier: null, meta{error.type=…#FEATURE_NOT_SUPPORTED}, {}
+                    else
+                        R-->>Verifier: Result{doc, Raw, Info, Source, resolutionMeta{contentType}, docMeta}
+                    end
+                end
             end
         end
     end
@@ -186,18 +206,22 @@ sequenceDiagram
     else fragment present
         DR->>Sel: selectByID(doc, "did:example:123#key-1")
         Note over Sel: absolutize relative DID URLs, then compare id. Check verificationRelationship authorization
-        alt match and authorized
+        alt match (with verificationRelationship: a conforming VM that is authorized)
             Sel-->>DR: VerificationMethod / Service
             DR-->>Verifier: meta{contentType}, resource, contentMeta
-        else no match
-            Sel-->>DR: nil
-            DR-->>Verifier: meta{error.type=…#NOT_FOUND}, null, {}
-        else not authorized (verificationRelationship mismatch)
+        else verificationRelationship given, target is not a conforming VM (no match, Service, non-conforming VM)
+            Sel-->>DR: nil / Service / non-conforming VM
+            Note over DR: DID Resolution §5.4.2: error MUST, type INVALID_VERIFICATION_METHOD SHOULD
+            DR-->>Verifier: meta{error.type=https://w3id.org/security#INVALID_VERIFICATION_METHOD}, null, {}
+        else verificationRelationship given, not authorized (not in the relationship array)
             Sel-->>DR: unauthorized
-            DR-->>Verifier: meta{error.type=CID …#INVALID_RELATIONSHIP_FOR_VERIFICATION_METHOD}, null, {}
+            DR-->>Verifier: meta{error.type=https://w3id.org/security#INVALID_RELATIONSHIP_FOR_VERIFICATION_METHOD}, null, {}
+        else no verificationRelationship, no match
+            Sel-->>DR: nil
+            DR-->>Verifier: meta{error.type=…/ns/did#NOT_FOUND}, null, {}
         end
     else no fragment
-        DR-->>Verifier: meta{contentType:"application/did"}, wholeDoc, docMeta
+        DR-->>Verifier: meta{contentType: media type of the returned document representation}, wholeDoc, docMeta
     end
 ```
 
@@ -303,10 +327,12 @@ sequenceDiagram
     C10->>R: Resolve(did, opts)  %% accept passed unchanged
     R->>R: consume and validate driver bytes, transcode to V10 if they do not match accept, record Source (12 §6.2)
     R-->>C10: Result{doc, Raw, Source, resolutionMeta, docMeta}
-    alt RFC9457 error
+    alt accept representation cannot be produced (ErrAcceptNotSupported)
+        C10-->>L: meta{error:"representationNotSupported"}, null, {}  %% v1.0 §7.1.2
+    else RFC9457 error
         C10->>C10: map type URL → string code (…#NOT_FOUND → "notFound", 09 §6.1)
         C10-->>L: meta{error:"notFound"}, null, {}
-    else deactivated (not an error, same in both versions)
+    else deactivated (not an error. The v1.1 core returns no document, so the stream is empty and contentType is absent. Deviation DEV-V10-1 from v1.0 §7.1 and §7.1.2, 09 §6.1)
         C10-->>L: meta{}, null, docMeta{deactivated:true}
     else ok
         C10-->>L: meta{contentType: resolutionMeta.contentType}, Raw, docMeta

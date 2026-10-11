@@ -23,8 +23,10 @@ and DID Resolution, is extracted into [06](06-cid-data-model.md) and
    `…#CODE` URL. There is no `resolveRepresentation()`. `deactivated` is not an
    error (HTTP 410). See [07](07-did-resolution-contract.md).
 2. **The verification method, service and relationship data model is
-   delegated to Controlled Identifiers 1.0.** Key formats are mutually
-   exclusive, Multikey uses multicodec prefixes, private JWK members are
+   delegated to Controlled Identifiers 1.0.** A verification method has at
+   most one public key material property and at most one secret key material
+   property (the type decides which, and a method without public key material
+   cannot verify proofs), Multikey uses multicodec prefixes, private JWK members are
    forbidden, and verification method retrieval binds both ways. DID adds only
    its own constraints (`id` is a DID URL, `controller` is a DID). See
    [06](06-cid-data-model.md).
@@ -56,6 +58,7 @@ and DID Resolution, is extracted into [06](06-cid-data-model.md) and
 | [09-v1.0-compat.md](09-v1.0-compat.md) | v1.0 Recommendation comparison, version detection and production profiles, the v1.0 resolution adapter and its error mapping |
 | [10-abnf-appendix.md](10-abnf-appendix.md) | Full ABNF (the parser's reference), conformance test vectors, context file digests |
 | [12-standard-core-and-sage-extension.md](12-standard-core-and-sage-extension.md) | Standard-first principle and the advanced SAGE extension, module layout, trust boundary, agent information management, role layers, decisions 16 to 23 |
+| [13-xbar-verification.md](13-xbar-verification.md) | X-bar verification of both language versions against the pinned specifications: method, results by round, changes, recorded deviations and remaining risk |
 | [standards.md](standards.md) | Dated W3C publications the design follows, with SHA-256 |
 
 Number 11 is not published here: it is a jurisdiction-specific legal review
@@ -67,7 +70,8 @@ maintained outside this repository.
 Go), 06 and 07 (the delegated specifications in detail), 09 (v1.0
 compatibility), 10 (starting implementation: ABNF, test vectors, assets), 12
 (the standard core, the SAGE extension and the repository layout). 08 holds the
-verification history.
+verification history, and 13 the X-bar verification against the
+specifications.
 
 ## Provenance
 

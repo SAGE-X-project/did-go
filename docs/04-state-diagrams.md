@@ -28,7 +28,7 @@ stateDiagram-v2
     note right of Deactivated
         Deactivation is irreversible (subject to method policy).
         A Resolve result has didDocument=null, didDocumentMetadata.deactivated=true,
-        and HTTP 410 (DID Resolution §4.4).
+        and HTTP 410 (DID Resolution §4.4; the 410 comes from the §12.1 HTTP(S) binding).
     end note
 ```
 
@@ -81,10 +81,11 @@ stateDiagram-v2
     }
     state "Consume (UC-4)" as C {
         [*] --> C_TypeCheck
-        C_TypeCheck --> C_RootCheck: declared media type recorded (09 §4)
+        C_TypeCheck --> C_RootCheck: representation selected from the declared media type (09 §4)
         C_RootCheck --> C_Error: root ≠ JSON Object
         C_RootCheck --> C_VerDetect: JSON Object
-        C_VerDetect --> C_Map: version fixed (@context[0] first, else media type or Expected, 09 §4 steps 1 to 4)
+        C_VerDetect --> C_Map: version fixed (the DID media type decides, a non-v1 @context on did+json is recorded in UnexpectedContext, low-precision uses @context[0], else Expected, else VUnknown, 09 §4 steps 1 to 5)
+        C_VerDetect --> C_Error: @context that does not fit did+ld+json or did, or a Strict violation
         C_Map --> C_Preserve: type mapping
         C_Preserve --> C_LD: rule 3 known repr-specific→map / rule 4 unrecognized→data model
         C_LD --> C_Validate: undefined term drop (JSON-LD)
@@ -110,12 +111,17 @@ stateDiagram-v2
     OptionCheck --> ErrInvalidOptions: option invalid
     OptionCheck --> Reading: options validated
     Reading --> ErrNotFound: not in VDR
+    Reading --> ErrFeatureNotSupported: driver does not support an option (ErrNotSupported, for example versionTime)
+    Reading --> ErrInternal: other driver error
+    ErrInternal --> [*]: error.type=…#INTERNAL_ERROR (500)
+    Reading --> ErrInvalidDoc: driver metadata violation (checked before deactivated, 12 §6.2)
     Reading --> Deactivated: deactivated record
     Reading --> Consuming: raw document obtained
     Consuming --> ErrInvalidDoc: consumption failed
     Consuming --> Resolved: Document created
+    Consuming --> ErrFeatureNotSupported: no acceptable representation can be produced (ErrAcceptNotSupported, 12 §6.2 step 4)
 
-    Resolved --> [*]: doc + meta{contentType:"application/did"}
+    Resolved --> [*]: doc + meta{contentType = media type of the bytes returned in Raw (12 §6.2)}
     Deactivated --> [*]: didDocument=null + docMeta{deactivated:true} (HTTP 410, not an error)
     ErrInvalidDid --> [*]: error.type=…#INVALID_DID (400)
     ErrMethodNotSupported --> [*]: error.type=…#METHOD_NOT_SUPPORTED (501)
@@ -144,8 +150,10 @@ stateDiagram-v2
     Absolutize --> Lookup: match id in verificationMethod
     Lookup --> Dangling: no match
     Lookup --> Ready: VM found
-    Ready --> KeyParse: publicKeyMultibase XOR publicKeyJwk
+    Ready --> KeyParse: public key material (publicKeyMultibase or publicKeyJwk, at most one)
+    Ready --> NoKey: no public key material (conforming, but cannot verify proofs)
     KeyParse --> [*]: used for verification
+    NoKey --> [*]: not used for proof verification
     Dangling --> [*]: ErrDanglingReference
 ```
 

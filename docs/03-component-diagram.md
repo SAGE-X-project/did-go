@@ -49,18 +49,22 @@ flowchart TB
     REPR --> SPEC
     MODEL --> VM
     MODEL --> SYN
+    VM --> SYN
     REPR --> MODEL
     REPR --> LD
+    LD --> SPEC
     LD -. integrity check .-> CTX
     RES --> METH
+    RES --> MODEL
     RES --> REPR
-    METH --> MKEY & MWEB
+    METH --> SYN & MODEL
+    MKEY & MWEB --> METH
     MKEY & MWEB --> CRYPTO
     MKEY & MWEB --> VDR
     RESOLVER --> RES
     COMPAT --> RES
     COMPAT --> REPR
-    VM --> CRYPTO
+    CRYPTO --> VM
     ADV -. implements method driver .-> METH
 ```
 
@@ -72,14 +76,14 @@ flowchart TB
 |-----------|----------------|----|------------|
 | `spec` | SpecVersion (V10/V11/VUnknown), version-specific context URLs | FR-V1 | none |
 | `did` | DID/DID URL ABNF parsing and validation, relative URL absolutization, percent-encoding (version independent) | FR-S1 to S6 | none |
-| `document` | DID document data model (INFRA types, v1.1 superset), Builder, Validator (+ProfileV10), immutable documents, relationship/reference selectors | FR-D1,D2,D7,V3 | `did`, `vm` |
-| `vm` | VerificationMethod/Service/5 Relationship structs, CID constraint validation (key XOR, etc.) | FR-D3,D4,D5,P3 | `did`, `crypto` |
+| `document` | DID document data model (INFRA types, v1.1 superset), Builder, Validator (+ProfileV10), immutable documents, relationship/reference selectors, the didDocumentMetadata type `document.Metadata` (including equivalentId/canonicalId, shared by method and resolution) | FR-D1,D2,D7,V3 | `did`, `vm` |
+| `vm` | VerificationMethod/Service/5 Relationship structs, CID constraint validation (at most one public and at most one secret key material property, material chosen by type, etc.) | FR-D3,D4,D5,P3 | `did` (the Multikey prefix and length table lives in `vm` as standard-library-only data) |
 | `representation` | JSON Producer/Consumer (`application/did` plus 2 legacy types), version detection and SpecVersion production, deterministic lossless serialization | FR-R1,R2,R4,R5,V1,V2,V3 | `document`, `jsonld`, `spec` |
 | `jsonld` | `@context` injection and validation (per version), undefined term drop, base context integrity (dual v1 and v1.1) | FR-R3,R6,V5 | embedded contexts |
-| `resolution` | Resolver/Dereferencer interfaces, resolutionOptions/metadata (including equivalentId/canonicalId)/error catalog | FR-X1 to X4,D6 | `method`, `representation` |
+| `resolution` | Resolver/Dereferencer interfaces, resolutionOptions, resolution metadata, error catalog, `DocumentMetadata` (alias of `document.Metadata`) | FR-X1 to X4,D6 | `method`, `representation`, `document` |
 | `method` | Method interface (CRUD + authz), method-name Registry | FR-M1 to M6 | `did`, `document` |
 | `method/key`,`method/web` | Reference method implementations | FR-M1 to M6 | `method`, `crypto`, VDR |
-| `crypto` | Multikey/JWK encoding and signature verification (CID delegation) | FR-D3,P1 | external crypto library |
+| `crypto` | Multikey/JWK encoding and signature verification (CID delegation) | FR-D3,P1 | `vm` (prefix table), external crypto library |
 | `resolution/universal` | DID-RESOLUTION spec conformant adapter | FR-X1 to X4 | `resolution` |
 | `resolution/compat` | v1.0 REC §7 contract adapter: `resolveRepresentation()`, RFC9457 to string error mapping, accepts `hl` | FR-V4 | `resolution`, `representation` |
 
@@ -94,8 +98,9 @@ flowchart LR
         IResolver{{"Resolver interface"}}
         IDereferencer{{"Dereferencer interface"}}
         IMethod{{"Method interface"}}
-        ICodec{{"KeyCodec interface"}}
     end
+
+    ICodec{{"KeyCodec interface<br/>(crypto package, adapter layer)"}}
 
     UNIV[Universal Resolver adapter] -.implements.-> IResolver
     V10C[v1.0 compat adapter] -.wraps.-> IResolver
@@ -106,7 +111,7 @@ flowchart LR
 
     IResolver --> IMethod
     IDereferencer --> IResolver
-    IMethod --> ICodec
+    DKEY & DWEB --> ICodec
 ```
 
 **Design principles**
@@ -123,7 +128,8 @@ flowchart TB
     subgraph clientlib["Embedded library mode"]
         A1[Go application]
         A1 --> CORELIB[[did-core packages]]
-        CORELIB --> ADPT1[method plugins]
+        A1 --> ADPT1[method plugins]
+        ADPT1 --> CORELIB
     end
 
     subgraph service["Resolver service mode"]

@@ -25,11 +25,13 @@ did-go/
 │   ├── value.go         # INFRA type system
 │   ├── builder.go
 │   ├── validator.go
+│   ├── metadata.go      # didDocumentMetadata (document.Metadata, 07 §7), shared by method and resolution
 │   └── selector.go      # relationship/reference selector
 ├── vm/                  # VerificationMethod, Relationship, Service  FR-D3/D4/D5
 │   ├── method.go
 │   ├── relationship.go
-│   └── service.go
+│   ├── service.go
+│   └── multikey.go      # Multikey prefix and length table (standard-library-only data, 06 §5)
 ├── representation/      # application/did Producer/Consumer        FR-R*
 │   ├── representation.go
 │   ├── json.go
@@ -43,8 +45,9 @@ did-go/
 │   ├── dereferencer.go
 │   ├── metadata.go
 │   ├── errors.go        # error code catalog
-│   └── compat/          # v1.0 contract adapter (resolveRepresentation, string errors)  FR-V4
-│       └── v10.go
+│   ├── compat/          # v1.0 contract adapter (resolveRepresentation, string errors)  FR-V4
+│   │   └── v10.go
+│   └── universal/       # DID-RESOLUTION conformant adapter (DID parameters, HTTP binding, caching)  FR-X1~X4
 ├── method/              # Method interface, Registry, reference implementations     FR-M*
 │   ├── method.go
 │   ├── registry.go
@@ -54,7 +57,7 @@ did-go/
     └── codec.go
 ```
 
-Dependency direction: `method/*` and `crypto` adapters → `resolution`, `method` (contracts) → `document`, `vm`, `representation` → `did` → `spec`. **The core does not import adapters.** (`resolution/compat` is in the adapter layer. The core does not import it.)
+Dependency direction: `method/*` adapters → `method` (contract) → `document`, `did`. `document` → `vm`, `did`. `vm` → `did`. `jsonld` → `spec`. `did` and `spec` import nothing. The `method/*` adapters also use the `crypto` adapter. `resolution` → `method`, `representation`, `document`. `representation` → `document`, `jsonld`, `spec`. The `crypto` adapter → `vm`. **The core does not import adapters.** `resolution/compat` and `resolution/universal` are in the adapter layer, and the core does not import them. The Multikey prefix and length table is pure data that uses only the standard library and lives in `vm`. `crypto` imports `vm` to use that table. `vm` does not import `crypto`.
 
 ### 1.1 `spec`: version model (FR-V1)
 
@@ -179,17 +182,21 @@ type Document struct {
     capabilityDelegation []vm.RelValue
     service              []vm.Service
     // Two buckets (Production/Consumption consumer rules 3 and 4, FR-D7):
-    extensions   document.Map        // rule 4: unknown *non*-representation-specific entries → part of the data model
+    extensions   Map                 // rule 4: unknown *non*-representation-specific entries → part of the data model
     reprEntries  map[string]any      // rule 3: *known* representation-specific entries (for example @context)
 }
 // Note: equivalentId/canonicalId are not in the Core Properties table, context or vocab of this
 //   v1.1 document. Their formal definition is didDocumentMetadata in DID-Resolution →
-//   resolution.DocumentMetadata (07 §5).
+//   document.Metadata (metadata.go; resolution.DocumentMetadata is its alias, 07 §5, §7).
 //   However, DID Core §Equivalence Properties (Security chapter) describes them as properties
 //   "inside the DID document". This is a tension between specs. See 08-verification-report.md §2.
 
 func (d *Document) ID() did.DID { return d.id }
 func (d *Document) Relationship(r vm.Purpose) []vm.RelValue
+
+// ExpandRelativeURLs returns a copy in which every relative DID URL in object ids and verification relationship entries
+// is made absolute (DID Resolution §4.4 step 6 expandRelativeUrls, 07 §1.1 step 6). The receiver is not changed.
+func (d *Document) ExpandRelativeURLs() *Document
 ```
 
 ### 3.3 Verification Method / Relationship / Service (`vm`)
@@ -206,19 +213,26 @@ package vm
 // canonical for the DID layer.
 type Method struct {
     ID         did.DIDURL // required
-    Type       string     // required: "Multikey" | "JsonWebKey"
+    Type       string     // required: string that references exactly one VM type (CID §2.2). Multikey, JsonWebKey: full validation.
+                          // Other types get only the generic form checks (06 §5) and do not verify proofs unless a codec is registered
     Controller did.DID     // required (claim)
-    Expires    *time.Time  // XSD dateTimeStamp; proofs are not verified after this time
-    Revoked    *time.Time  // must not be used after this time
-    // Verification material: exactly one for the same material (CID §2.2.1 MUST NOT both)
-    PublicKeyMultibase string          // Multikey: z+base58btc, multicodec prefix
+    Expires    *time.Time  // XSD dateTimeStamp; proofs are not verified at or after this time
+    Revoked    *time.Time  // must not be used at or after this time
+    // Verification material: each property is OPTIONAL and chosen by type. At most one per material
+    // (DID Core 1.0 §5.2.1, CID §2.2.1 MUST NOT both). Without public key material the VM cannot verify proofs.
+    PublicKeyMultibase string          // Multibase string (any type). Multikey: z+base58btc, multicodec prefix
     PublicKeyJwk       map[string]any  // JsonWebKey: RFC7517, private members such as 'd' are forbidden
-    // Secret material: excluded from serialization by default (FR-P3). Only with IncludeSecret opt-in.
+    // Secret material: excluded from serialization by default (FR-P3). Only with IncludeSecret opt-in. Not both either.
     SecretKeyMultibase string
-    SecretKeyJwk       map[string]any
+    SecretKeyJwk       map[string]any  // if present, an RFC7517 JWK map
+    // Extra holds additional properties that are not modeled (DID Core 1.0 §5.2, CID §2.2 MAY). The Consumer
+    // fills it and the Producer writes it back unchanged. Additional properties alone never cause rejection.
+    Extra map[string]any
 }
 
-// Validate: key material XOR, required fields, absence of JWK private members, Multikey prefix/length.
+// Validate: required fields, no duplicated material (at most one of publicKeyJwk and publicKeyMultibase,
+// at most one secret key property; no material at all is conforming), Multibase form of publicKeyMultibase
+// (any type), absence of JWK private members, JWK form of secretKeyJwk, Multikey prefix/length. See 06 §2.1, §5, §11.
 func (m Method) Validate() error
 
 // RelValue is an element of a verification relationship: an embedded VM or a reference.
@@ -240,14 +254,15 @@ const (
 // Service is CID §2.1.4. Only type and serviceEndpoint are required; id is optional (if present, it must not repeat within the document).
 // (The CID parent sentence reads as if id were required, but the more specific sub-definition and the spec examples make id optional. See 06 §8.)
 type Service struct {
-    ID              string          // optional. URL | DID. Must be unique if present.
+    ID              string          // V11: optional, URL | DID. V10: required, RFC 3986 URI of any scheme (urn:uuid etc.). Must be unique if present.
     Type            []string        // required. string | set
     ServiceEndpoint []Endpoint      // required. string | map | set
+    Extra           map[string]any  // additional properties beyond id, type, serviceEndpoint (MAY). Kept on consume, written back unchanged on produce
 }
 
 // Endpoint is polymorphic: a string URL or a map.
 type Endpoint struct {
-    URL string          // if a string, it must be a valid URL (§Services)
+    URL string          // V11: valid URL (URL Standard). V10: valid RFC 3986 URI, normalized per RFC 3986 §6 and its scheme rules (06 §8)
     Map map[string]any  // map form
 }
 func (s Service) Validate() error
@@ -271,8 +286,8 @@ func (b *Builder) Build() (*Document, error)
 
 // Validate enforces the §Core Properties and §Data Model norms.
 //  - id required, DID syntax
-//  - VM key format XOR
-//  - service endpoint URL validity
+//  - no duplicated VM material (at most one per material, no material is allowed). See vm.Method.Validate
+//  - service endpoint URL validity (ProfileV10: RFC 3986 URI plus normalization)
 //  - no duplicate set elements
 //  - whether relationship references dangle within the document (warning/option)
 func Validate(d *Document) error // == ValidateProfile(d, ProfileV11)
@@ -281,7 +296,7 @@ func Validate(d *Document) error // == ValidateProfile(d, ProfileV11)
 type Profile int
 const (
     ProfileV11 Profile = iota // default: CID norms, service.id optional
-    ProfileV10                // v1.0 REC §5.4: service.id required. Properties undefined in v1.0 (expires etc.) produce warnings
+    ProfileV10                // v1.0 REC §5.4: service.id required (RFC 3986 URI), endpoint strings are normalized URIs. Properties undefined in v1.0 (expires etc.) produce warnings
 )
 
 func ValidateProfile(d *Document, p Profile) error
@@ -291,6 +306,9 @@ func ValidateProfile(d *Document, p Profile) error
 
 ```go
 // ResolveRef resolves a relationship reference to the actual Method, including relative URL absolutization.
+// It looks only inside the subject document. To accept verification methods from controller documents
+// (v1.0 §5.1.2, SHOULD), a caller that has a resolver resolves each controller DID and runs ResolveRef
+// again on that document (06 §7, ProfileV10 only).
 func (d *Document) ResolveRef(ref did.DIDURL) (*vm.Method, error) // ErrDanglingReference
 
 // SelectByID finds the fragment dereference target (VM/Service). (UC-6)
@@ -324,25 +342,30 @@ type Producer interface {
 }
 
 // ConsumeInfo is the detection result on consumption (FR-V1).
-// Detection order (09 §4): if @context is present, its first value decides → otherwise did+json is V10, application/did is V11, did+ld+json is an error
-//   → for a low-precision type, Expected, or else VUnknown (v1.1 rules), with Assumed=true → anything else is an error.
+// Detection rules (09 §4): a declared DID media type decides the representation and version (did+json, did+ld+json are V10; application/did is V11).
+//   did+json is V10 JSON. A present @context is kept as a representation-specific entry; if its first value is not …/did/v1,
+//   it is recorded in UnexpectedContext (no spec makes this non-conforming, so it is not an error; Strict makes it one).
+//   did+ld+json requires @context with first value …/did/v1, and application/did requires first value …/did/v1.1 if @context is present; otherwise error.
+//   For a low-precision type, inspect the payload: the first @context value decides;
+//   without @context, Expected, or else VUnknown (v1.1 rules), with Assumed=true. Any other media type, or none, is an error.
 type ConsumeInfo struct {
-    DetectedVersion spec.Version
-    IsJSONLD        bool      // whether @context is present
-    Mismatch        *Mismatch // set when the declared media type disagrees with the content; nil otherwise
-    Assumed         bool      // true when the version was assumed for a low-precision type
+    DetectedVersion   spec.Version
+    IsJSONLD          bool          // true for a JSON-LD representation: did+ld+json, or application/did or low-precision input with @context
+    LowPrecision      *LowPrecision // set when a low-precision type was received and the payload decided the representation; nil under a DID media type
+    Assumed           bool          // true when the version was decided without @context for a low-precision type
+    UnexpectedContext string        // for did+json input, the first @context value when it is not …/did/v1; "" otherwise
 }
 
-// Mismatch records a declared media type that differs from the representation detected in the content.
-type Mismatch struct {
-    Declared string // declared media type
-    Detected string // media type of the representation detected in the content
+// LowPrecision records how the representation of an input received under a low-precision media type was decided from the payload.
+type LowPrecision struct {
+    Declared string // received low-precision media type (application/json, application/ld+json)
+    Detected string // DID media type of the representation detected in the payload
 }
 
 // ConsumeOptions are the consumption options.
 type ConsumeOptions struct {
     Expected spec.Version // version to use for a low-precision type without @context; VUnknown means none
-    Strict   bool         // turns Mismatch and Assumed into errors
+    Strict   bool         // turns the payload decision for a low-precision type, Assumed, and did+json UnexpectedContext into errors
 }
 
 // Consumer: serialization + media type → data model. MUST error on non-conforming input.
@@ -351,8 +374,9 @@ type Consumer interface {
     Consume(data []byte, mediaType string, opts ConsumeOptions) (*document.Document, ConsumeInfo, error)
 }
 
-// MediaTypeOf derives the representation's media type from the detection result (12 §6.2).
-// V10 without @context → application/did+json, V10 with @context → application/did+ld+json, otherwise → application/did.
+// MediaTypeOf derives the representation's DID media type from the detection result (12 §6.2).
+// V10 with IsJSONLD false → application/did+json, V10 with IsJSONLD → application/did+ld+json, otherwise → application/did.
+// When consumed under a DID media type it equals the declared type; for low-precision input it equals LowPrecision.Detected.
 func MediaTypeOf(info ConsumeInfo) string
 
 // CoreMediaTypes are the media types the core Producer can produce from a validated document.
@@ -373,8 +397,8 @@ func (r *JSONRepresentation) Consume(data []byte, mediaType string, opts Consume
 **Key points for implementing the norms**
 - Producer: place every entry in the root JSON Object. `DateTime` → `time.RFC3339`, then normalize to UTC and truncate sub-seconds (`2020-12-20T19:17:47Z`). `Set`/`List` → JSON Array. Fixed ordering rules give determinism (NFR-1).
 - Consumer: use `json.Decoder.UseNumber()` to tell integer from double without loss. If the root is not an Object, return `ErrNonConforming`. **Entry classification (consumer rules 3 and 4)**: *known* representation-specific entries such as `@context` go to `Document.reprEntries` (rule 3). Any other unrecognized property is added to `Document.extensions` as **part of the data model** (rule 4). Unrecognized entries are not put in the representation-specific map (FR-D7).
-- `mediatype.go`: heuristic for low-precision types (`application/json`, `application/ld+json`). If `@context[0]` is the v1 or v1.1 context, or the top-level `id` has DID syntax, treat the input as a DID document (informative).
-- **Version detection and normalization (FR-V1/V2)**: `@context` is checked first. A first value of `…/did/v1` means V10 and `…/did/v1.1` means V11; a declared DID media type that disagrees is recorded as `Mismatch`. Without `@context`, `did+json` means V10, `application/did` means V11, and `did+ld+json` is an error. For a low-precision type without `@context`, `Expected` is used, or else VUnknown (consumed with v1.1 rules), and `Assumed` is recorded. In every case the result is normalized to the same `Document`. Details in [`09`](09-v1.0-compat.md) §4.
+- `mediatype.go`: payload decision for low-precision types (`application/json`, `application/ld+json`), following `09` §4 step 4. A first `@context` value of `…/did/v1.1` gives V11 and `…/did/v1` gives V10. Without `@context`, `Expected` is used, or else VUnknown, and `Assumed` is recorded. Any other first `@context` value is an error (step 5). In every case the top-level `id` must be a valid DID.
+- **Version detection and normalization (FR-V1/V2)**: a declared DID media type decides the representation and the version (§6.1 of v1.0 and v1.1, "A conforming consumer MUST determine the representation of a DID document using the Media Type input string."). `did+json` means V10 JSON, `did+ld+json` means V10 JSON-LD (`@context` required, first value `…/did/v1`), and `application/did` means V11 (if `@context` is present, first value `…/did/v1.1`). Reading the `@context` of an `application/did` document as a signal of JSON-LD processing, and so requiring the v1.1 first value, is did-go's interpretation ([`12`](12-standard-core-and-sage-extension.md) §6.1). For `did+ld+json` and `application/did`, a `@context` that does not fit the type is an error. For `did+json`, a present `@context` is kept as a representation-specific entry; if its first value is not `…/did/v1`, it is recorded in `UnexpectedContext` and consumption continues. No spec statement makes such a document non-conforming, and the standard core is not stricter than the specs. With `Strict` it is an error. For a low-precision type the payload is inspected: the first `@context` value decides; without `@context`, `Expected` is used, or else VUnknown (consumed with v1.1 rules), and `Assumed` is recorded. The received type is recorded in `LowPrecision`. Any other media type, or none, is an error. In every case the result is normalized to the same `Document`. Details in [`09`](09-v1.0-compat.md) §4.
 
 ```go
 // jsonld/context_v1_1.go (+ context_v1.go has the same shape)
@@ -439,7 +463,10 @@ type Method interface {
 type ReadResult struct {
     Data        []byte // serialized bytes produced by the driver
     ContentType string // media type the driver labels Data with; the resolver consumes Data with this as the declared type
-    Metadata    DocumentMetadata
+    // Metadata is the didDocumentMetadata. Its only type is document.Metadata (07 §7); resolution.DocumentMetadata is an
+    // alias of it. A driver can set created, updated, deactivated, nextUpdate, versionId, nextVersionId, equivalentId,
+    // canonicalId, proof and extension properties (Extra). method does not import resolution.
+    Metadata    document.Metadata
 }
 
 type ReadOptions struct {
@@ -448,15 +475,8 @@ type ReadOptions struct {
     MediaType   string // format the resolver picked from Produces() to match accept; empty means the driver default
 }
 
-type DocumentMetadata struct {
-    VersionID   string
-    Created     *time.Time
-    Updated     *time.Time
-    Deactivated bool
-    Extra       map[string]any
-}
-
 var (
+    // ErrNotSupported: the operation or an option (for example versionId, versionTime) is not supported. The resolver maps it to FEATURE_NOT_SUPPORTED (§6)
     ErrNotSupported  = errors.New("method: operation not supported")
     ErrUnauthorized  = errors.New("method: authorization failed")
     ErrNotFound      = errors.New("method: DID not found")
@@ -483,7 +503,7 @@ func (r *Registry) Lookup(name string) (Method, bool)
 
 > **Canonical: [`07-did-resolution-contract.md`](07-did-resolution-contract.md).** The text below is a summary against DID Resolution v1.0, W3C Candidate Recommendation Draft, 2026-10-01 (https://www.w3.org/TR/2026/CRD-did-resolution-1.0-20261001/). It reflects three settled facts:
 > (1) `resolveRepresentation()` does **not exist** in this version. It is merged into `resolve()` + the `accept` option + the `contentType` metadata.
-> (2) Errors are **RFC9457 Problem Details objects**, and `type` is a `https://www.w3.org/ns/did#<CODE>` URL (not a string code).
+> (2) Errors are **RFC9457 Problem Details objects**, and `type` is a URL (not a string code): `https://www.w3.org/ns/did#<CODE>` for DID Resolution errors and `https://w3id.org/security#<NAME>` for CID-derived errors (07 §4).
 > (3) `deactivated` is **not an error**. It is `didDocumentMetadata.deactivated=true` (+ HTTP 410).
 
 ```go
@@ -496,9 +516,12 @@ type Resolver interface {
 }
 
 type ResolutionOptions struct {
-    Accept             string     // HTTP Accept value (default application/did)
+    Accept             string     // HTTP Accept value. Empty: the driver bytes are returned unchanged; with ExpandRelativeURLs they are re-produced in the detected representation (12 §6.2)
     ExpandRelativeURLs bool
     VersionID          string     // DID parameter
+    // VersionTime uses the 07 §3 datetime format (UTC, no sub-second precision). Serialization reuses the
+    // datetime marshaller of document.Metadata. An input with an offset other than Z, or with sub-second
+    // precision, is rejected (did-go policy): INVALID_OPTIONS (INVALID_DID_URL from a DID URL parameter).
     VersionTime        *time.Time
     Extra              map[string]any
 }
@@ -514,6 +537,9 @@ type Result struct {
     DocumentMetadata   DocumentMetadata // includes deactivated
 }
 
+// DocumentMetadata is an alias of document.Metadata (07 §7). It is the same type as method.ReadResult.Metadata, so it is passed on without conversion.
+type DocumentMetadata = document.Metadata
+
 // SourceBytes holds the bytes the driver originally returned and their media type.
 type SourceBytes struct {
     Data        []byte
@@ -521,16 +547,20 @@ type SourceBytes struct {
 }
 
 type ResolutionMetadata struct {
-    ContentType string           // media type of the detected representation; not copied from the driver label (12 §6.2)
+    // ContentType is the media type of the bytes actually returned in Raw. The caller parses with it (DID Resolution §4.2 MUST).
+    // When the driver bytes are returned it is the DID media type the driver labeled them with, or, for a low-precision label, the
+    // precise DID media type of the detected representation; when the core transcoded it is the DID media type the core produced (12 §6.2)
+    ContentType string
     Error       *Error           // RFC9457, only on error
     Proof       []map[string]any
     Extra       map[string]any
 }
 
-// Error is an RFC9457 Problem Details object. type=https://www.w3.org/ns/did#<CODE>
+// Error is an RFC9457 Problem Details object. type is https://www.w3.org/ns/did#<CODE> for DID Resolution
+// errors and https://w3id.org/security#<NAME> for CID-derived errors (07 §4).
 type Error struct {
     Type, Title, Detail, Instance string
-    Status                        int    // HTTP mapping; used only for types not in the binding table (07 §7)
+    Status                        int    // HTTP mapping; used only when neither the type nor Refines is in the binding table (07 §7)
     Refines                       string // type URI in the 07 §4 table that this type refines; empty for a type in the table
 }
 ```
@@ -551,14 +581,15 @@ type DereferencingOptions struct {
     Extra                    map[string]any
 }
 
+// DereferenceResult is «dereferencingMetadata, contentStream, contentMetadata» of dereference() (07 §2).
 type DereferenceResult struct {
-    ContentStream         any // Document | vm.Method | vm.Service | []string(uri-list) | []byte
-    DereferencingMetadata ResolutionMetadata
-    ContentMetadata       DocumentMetadata
+    ContentStream         any                // spec contentStream. Document | vm.Method | vm.Service | []string(uri-list) | []byte
+    DereferencingMetadata ResolutionMetadata // spec dereferencingMetadata
+    ContentMetadata       DocumentMetadata   // spec contentMetadata
 }
 ```
 
-**Default composed implementation (`DefaultResolver`)**: the UC-5 sequence in code. Failures are reported in `Metadata.Error` (RFC9457), not as `error`. The steps follow [`12`](12-standard-core-and-sage-extension.md) §6.2.
+**Default composed implementation (`DefaultResolver`)**: the UC-5 sequence in code. Failures are reported in `Metadata.Error` (RFC9457), not as `error`. After the method lookup and before `Read`, the options are checked (07 §1.1 steps 3 and 4): an unsupported option is `FEATURE_NOT_SUPPORTED` and an invalid option is `INVALID_OPTIONS`. If the driver returns `method.ErrNotSupported` (for example, `versionTime` is not supported), the result is `FEATURE_NOT_SUPPORTED`, not `INTERNAL_ERROR`. After `Read`, the document metadata the driver supplied is validated before the `deactivated` check (`validateMetadata`); a violation is `INVALID_DID_DOCUMENT`. The later steps follow [`12`](12-standard-core-and-sage-extension.md) §6.2.
 
 ```go
 type DefaultResolver struct {
@@ -572,14 +603,29 @@ func (r *DefaultResolver) Resolve(ctx context.Context, d did.DID, opts Resolutio
     if !ok {
         return failed(ErrMethodNotSupported)
     }
-    // Pick the format the driver can produce that matches accept; empty if none (driver default).
-    want, _ := negotiate(opts.Accept, m.Produces())
+    // 07 §1.1 steps 3 and 4: an unsupported option (including a refused noCache and a versionId/versionTime the method
+    // cannot serve) is FEATURE_NOT_SUPPORTED, and an invalid option is INVALID_OPTIONS.
+    if e := validateOptions(opts, m); e != nil {
+        return failed(e)
+    }
+    // Pick the format the driver can produce that matches accept; empty if accept is empty or nothing matches (driver default).
+    want := ""
+    if opts.Accept != "" {
+        want, _ = negotiate(opts.Accept, m.Produces())
+    }
     rr, err := m.Read(ctx, d, method.ReadOptions{VersionID: opts.VersionID, VersionTime: opts.VersionTime, MediaType: want})
     switch {
     case errors.Is(err, method.ErrNotFound):
         return failed(ErrNotFound)
+    case errors.Is(err, method.ErrNotSupported): // for example, the driver does not support versionTime
+        return failed(ErrFeatureNotSupported)
     case err != nil:
         return failed(ErrInternal)
+    }
+    // rr.Metadata and Result.DocumentMetadata have the same type (document.Metadata).
+    // Driver-supplied metadata is validated before the deactivated check (12 §6.2). A violation is INVALID_DID_DOCUMENT.
+    if e := validateMetadata(rr.Metadata, d); e != nil {
+        return failed(e)
     }
     if rr.Metadata.Deactivated { // not an error: document is null, signaled through metadata
         return Result{DocumentMetadata: rr.Metadata}
@@ -589,11 +635,10 @@ func (r *DefaultResolver) Resolve(ctx context.Context, d did.DID, opts Resolutio
     if err != nil || doc.ID() != d {
         return failed(ErrInvalidDIDDocument)
     }
-    // 2. contentType comes from the detected representation, not the driver label. A disagreement is recorded in Info.
+    // 2. detected is the DID media type of the representation in the driver bytes. If the driver used a DID media type it is that value;
+    //    for a low-precision label it is the precise DID media type of the representation detected in the payload, and the received label remains in info.LowPrecision.
+    //    The result contentType is the media type of the bytes returned in Raw: detected for driver bytes (step 3), mt after transcoding (step 4).
     detected := representation.MediaTypeOf(info)
-    if info.Mismatch == nil && rr.ContentType != detected {
-        info.Mismatch = &representation.Mismatch{Declared: rr.ContentType, Detected: detected}
-    }
     if opts.ExpandRelativeURLs {
         doc = doc.ExpandRelativeURLs() // the bytes no longer match the document, so step 4 produces them again
     }
@@ -601,27 +646,38 @@ func (r *DefaultResolver) Resolve(ctx context.Context, d did.DID, opts Resolutio
     // 3. accept negotiation (RFC 9110 media ranges and q-values). If acceptable, return the driver bytes as is.
     if !opts.ExpandRelativeURLs && (opts.Accept == "" || acceptable(opts.Accept, detected)) {
         res.Raw = rr.Data
-        res.ResolutionMetadata = ResolutionMetadata{ContentType: detected}
+        res.ResolutionMetadata = ResolutionMetadata{ContentType: detected} // DID media type of the returned driver bytes
         return res
     }
     // 4. The core produces an acceptable representation from the validated document. If it cannot, FEATURE_NOT_SUPPORTED.
+    //    The type is FEATURE_NOT_SUPPORTED and the value is ErrAcceptNotSupported (the v1.0 adapter maps it to representationNotSupported, 07 §7).
     offers := representation.CoreMediaTypes
     if opts.Accept == "" {
         offers = []string{detected}
     }
     target, ok := negotiate(opts.Accept, offers)
     if !ok {
-        return failed(ErrFeatureNotSupported)
+        return failed(ErrAcceptNotSupported)
     }
     data, mt, err := r.Producer.Produce(doc, representation.OptionsFor(target))
     if err != nil { // for example, V10 production with a service that has no service.id
-        return failed(ErrFeatureNotSupported)
+        return failed(ErrAcceptNotSupported)
     }
     res.Raw = data
     res.Source = &SourceBytes{Data: rr.Data, ContentType: rr.ContentType}
-    res.ResolutionMetadata = ResolutionMetadata{ContentType: mt}
+    res.ResolutionMetadata = ResolutionMetadata{ContentType: mt} // media type of the representation the core produced
     return res
 }
+
+// validateOptions checks that the options are supported by this resolver and method (else ErrFeatureNotSupported)
+// and that they are valid (else ErrInvalidOptions).
+func validateOptions(opts ResolutionOptions, m method.Method) *Error
+
+// validateMetadata checks the document metadata the driver supplied (12 §6.2, DID Resolution §4.3).
+// Each equivalentId value and canonicalId are DIDs of the same method as d, deactivated is a boolean,
+// created, updated and nextUpdate can be written in the 07 §3 datetime format (no sub-second precision),
+// and Extra values are metadata structure types (07 §5). On a violation it returns ErrInvalidDIDDocument.
+func validateMetadata(md DocumentMetadata, d did.DID) *Error
 
 // negotiate picks the best of offers using the media ranges and q-values of RFC 9110 §12.5.1.
 // If accept is empty it picks offers[0].
@@ -647,19 +703,37 @@ type V10Resolver struct {
 }
 
 type V10ResolutionMetadata struct {
-    ContentType string // set only when resolveRepresentation succeeds (REQUIRED if successful); MUST NOT in resolve (v1.0 §7.1.2)
+    ContentType string // set only when resolveRepresentation succeeds (REQUIRED if successful); MUST NOT in resolve (v1.0 §7.1.2). Deactivated DID: DEV-V10-1 (09 §6.1)
     Error       string // "invalidDid" | "notFound" | "representationNotSupported" | … ("" on success)
 }
 
 func (r *V10Resolver) Resolve(ctx context.Context, d did.DID, opts resolution.ResolutionOptions,
 ) (V10ResolutionMetadata, *document.Document, resolution.DocumentMetadata)
 
+// If the core returns FEATURE_NOT_SUPPORTED (resolution.ErrAcceptNotSupported) because it cannot produce a representation
+// matching accept, the error is "representationNotSupported" (DID Core 1.0 §7.1.2, an exception to the 09 §6.1 table).
 func (r *V10Resolver) ResolveRepresentation(ctx context.Context, d did.DID, opts resolution.ResolutionOptions,
 ) (V10ResolutionMetadata, []byte, resolution.DocumentMetadata)
+
+// V10Dereferencer provides dereference from v1.0 REC §7.2.
+type V10Dereferencer struct {
+    Inner resolution.Dereferencer // v1.1 core
+}
+
+type V10DereferencingMetadata struct {
+    ContentType string // media type of contentStream on success
+    Error       string // "invalidDidUrl" | "notFound" | … ("" on success). Mapped with the 09 §6.1 table
+}
+
+// On failure, contentStream is nil and contentMetadata is an empty metadata structure (v1.0 §7.2 MUST).
+func (r *V10Dereferencer) Dereference(ctx context.Context, u did.DIDURL, opts resolution.DereferencingOptions,
+) (V10DereferencingMetadata, any, resolution.DocumentMetadata)
 ```
 
-- Error mapping: codes that the REC defines for the RFC9457 `type` map exactly (`INVALID_DID`→`invalidDid`, `NOT_FOUND`→`notFound`, `REPRESENTATION_NOT_SUPPORTED`→`representationNotSupported`, `INVALID_DID_URL`→`invalidDidUrl`). The rest follow the SCREAMING_SNAKE→camelCase rule. Full table in 09 §6.1.
+- Error mapping: codes that the REC defines for the RFC9457 `type` map exactly (`INVALID_DID`→`invalidDid`, `NOT_FOUND`→`notFound`, `REPRESENTATION_NOT_SUPPORTED`→`representationNotSupported`, `INVALID_DID_URL`→`invalidDidUrl`). The rest follow the SCREAMING_SNAKE→camelCase rule. Full table in 09 §6.1. There is one exception. If `resolveRepresentation` cannot produce the requested `accept` representation and the core returns `FEATURE_NOT_SUPPORTED` (the value `resolution.ErrAcceptNotSupported`), the v1.0 path returns `representationNotSupported` from DID Core 1.0 §7.1.2, not `featureNotSupported`.
 - `deactivated` is non-error metadata in both versions and passes through unchanged.
+- Failure results: `ResolveRepresentation` returns an empty didDocumentStream (nil). `V10Dereferencer.Dereference` in the same package returns a nil `contentStream` and an empty `contentMetadata` on failure, and its `dereferencingMetadata.error` is a single keyword ASCII string mapped with the 09 §6.1 table (09 §6).
+- Metadata: v1.0 does not allow number values, so the adapter converts numbers to strings, including nested values. `created`, `updated` and `nextUpdate` are written as UTC datetimes without sub-second digits (09 §6, 07 §5).
 - `accept` option: v1.0 §7.1.1 says **MUST NOT** with `resolve`. The adapter's `Resolve()` ignores `opts.Accept` (with a warning).
 - DID parameters: the v1.0-only `hl` is accepted by the adapter (not passed to the core). The v1.1-only `serviceType` yields `featureNotSupported` on the v1.0 path.
 - HTTP: there is no separate v1.0 binding. In the v1.1 binding, if Accept is a legacy type, the core returns the V10 representation through accept negotiation and transcoding (09 §6.3, 12 §6.2).
@@ -686,7 +760,7 @@ type Registry struct{ /* ... */ }
 func (r *Registry) Register(c KeyCodec)
 ```
 
-Reference codecs: `ed25519` (public prefix `0xed01`, 34B), `p256` (`0x8024`, 35B), `p384` (`0x8124`, 51B), `bls12-381-g2` (`0xeb01`, 98B), `sm2` (`0x8624`). The full multicodec prefix/length table and the secret key prefixes are in [`06-cid-data-model.md`](06-cid-data-model.md) §5. A secret key header in a public key position MUST be an error.
+Reference codecs: `ed25519` (public prefix `0xed01`, 34B), `p256` (`0x8024`, 35B), `p384` (`0x8124`, 51B), `bls12-381-g2` (`0xeb01`, 98B), `sm2` (`0x8624`). The full multicodec prefix/length table and the secret key prefixes are in [`06-cid-data-model.md`](06-cid-data-model.md) §5. This table is pure data that uses only the standard library and lives in `vm/multikey.go`; `crypto` imports `vm` to use it. So `vm.Method.Validate` checks prefixes and lengths without `crypto`, and the core does not import adapters (§1, NFR-3). A secret key header in a public key position MUST be an error. Multibase encoding and decoding must produce the same output as CID §3.1 and §3.2, and Multihash decoding checks the digest length against both the algorithm's output length and the length written in the value (06 §9).
 
 ---
 
@@ -705,7 +779,7 @@ Reference codecs: `ed25519` (public prefix `0xed01`, 34B), `p256` (`0x8024`, 35B
 |----|--------------------|
 | FR-S1~S6 | `did.Parse`, `did.ParseURL`, `did.ParseRef`, `abnf.go`, `SyntaxError` |
 | FR-D1,D2 | `document.Document`, `document.Value` (INFRA types) |
-| FR-D3 | `vm.Method`, `vm.Method.Validate` (key XOR) · norms 06 §2 |
+| FR-D3 | `vm.Method`, `vm.Method.Validate` (at most one public key material property and at most one secret key material property; presence determined by type; a method without public key material cannot verify proofs) · norms 06 §2 |
 | FR-D4 | `vm.RelValue`, `document.ResolveRef` · CID Retrieve VM 06 §3 |
 | FR-D5 | `vm.Service`, `vm.Endpoint`, `Service.Validate` · 06 §8 |
 | FR-D6 | `resolution.DocumentMetadata.{EquivalentID,CanonicalID}` (didDocumentMetadata, 07 §5) |
@@ -758,4 +832,4 @@ Reference codecs: `ed25519` (public prefix `0xed01`, 34B), `p256` (`0x8024`, 35B
 | 13 | Enforce `service.id` as required when producing V10; optional on consume and for V11 | v1.0 §5.4 MUST versus CID optional (T5). Guarantees output that conforms for consumers of each version |
 | 14 | Isolate the v1.0 contract in the `resolution/compat` adapter | `resolveRepresentation` and string errors are legacy. The core keeps the single 07 contract |
 | 15 | `hl` accepted by the adapter and not passed to the core; `serviceType` rejected on the v1.0 path | Explicit handling of the DID parameter asymmetry (09 §2.5) |
-| 16~23 | Standard first with advanced extensions; `advanced/sage` as a separate module; the document does not grant key authority; record detection mismatches; preserve original bytes; exclude staking; the core validates every driver output; accept negotiation and transcoding | [`12`](12-standard-core-and-sage-extension.md) §8 |
+| 16~23 | Standard first with advanced extensions; `advanced/sage` as a separate module; the document does not grant key authority; a declared DID media type decides the representation; preserve original bytes; exclude staking; the core validates every driver output; accept negotiation and transcoding | [`12`](12-standard-core-and-sage-extension.md) §8 |
