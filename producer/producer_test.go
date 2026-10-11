@@ -73,7 +73,7 @@ const simpleBody = `"id":"did:example:123456789abcdefghi","authentication":[{"id
 	`"type":"Multikey","controller":"did:example:123456789abcdefghi","publicKeyMultibase":"` + mk + `"}]}`
 
 func TestProfiles(t *testing.T) {
-	p := New()
+	p := New(AllowUndefinedTerms()) // the documents hold terms the base context does not define
 	d := simple(t)
 	cases := []struct {
 		name    string
@@ -169,7 +169,7 @@ const richBody = `"id":"did:example:123456789abcdefghi","controller":["did:examp
 	`"@sage":true,"fooExtension":42,"zz":{"b":1,"a":2.0}}`
 
 func TestAllEntries(t *testing.T) {
-	p := New()
+	p := New(AllowUndefinedTerms()) // the documents hold terms the base context does not define
 	d := rich(t)
 	t.Run("did11-cr20260305#production-and-consumption.10 every entry and representation-specific entry is serialized", func(t *testing.T) {
 		got, _ := produce(t, p, d, representation.ProduceOptions{Version: spec.V11, JSONLD: true})
@@ -234,7 +234,7 @@ func mustList(t *testing.T, vs ...document.Value) document.List {
 }
 
 func TestDataTypes(t *testing.T) {
-	p := New()
+	p := New(AllowUndefinedTerms()) // the documents hold terms the base context does not define
 	t.Run("core10#production.1 map, list, datetime, string, integer, double, boolean and null", func(t *testing.T) {
 		l := mustList(t, document.String("s"), document.Integer(-1), document.Double(3), document.Boolean(true), document.Null{},
 			document.NewDateTime(time.Date(2020, 12, 21, 4, 17, 47, 123, time.FixedZone("x", 9*3600))))
@@ -269,7 +269,7 @@ func TestDataTypes(t *testing.T) {
 }
 
 func TestContext(t *testing.T) {
-	p := New()
+	p := New(AllowUndefinedTerms()) // the documents hold terms the base context does not define
 	d := simple(t)
 	t.Run("core10#production-0.2 JSON-LD production includes @context", func(t *testing.T) {
 		got, _ := produce(t, p, d, representation.ProduceOptions{Version: spec.V10, JSONLD: true})
@@ -344,7 +344,7 @@ func jwkMethod(t *testing.T) vm.Method {
 }
 
 func TestSecretMaterial(t *testing.T) {
-	p := New()
+	p := New(AllowUndefinedTerms()) // the documents hold terms the base context does not define
 	m := jwkMethod(t)
 	d := build(t, document.NewBuilder(mustDID(t, subject)).VerificationMethod(m))
 	t.Run("cid10#JsonWebKey.12 secret key material is not written by default", func(t *testing.T) {
@@ -471,7 +471,7 @@ func TestShapes(t *testing.T) {
 }
 
 func TestDeterministic(t *testing.T) {
-	p := New()
+	p := New(AllowUndefinedTerms()) // the documents hold terms the base context does not define
 	first, _ := produce(t, p, rich(t), representation.ProduceOptions{JSONLD: true})
 	for range 20 {
 		if again, _ := produce(t, p, rich(t), representation.ProduceOptions{JSONLD: true}); again != first {
@@ -481,16 +481,16 @@ func TestDeterministic(t *testing.T) {
 }
 
 func TestUndefinedTerms(t *testing.T) {
-	strict := New(RejectUndefinedTerms())
+	strict := New()
 	d := rich(t)
-	t.Run("did11-cr20260305#json-ld-processors.6 RejectUndefinedTerms refuses terms the @context does not define", func(t *testing.T) {
+	t.Run("did11-cr20260305#json-ld-processors.6 by default the producer refuses terms the @context does not define", func(t *testing.T) {
 		_, _, err := strict.Produce(d, representation.ProduceOptions{JSONLD: true})
 		wantError(t, err, "did11-cr20260305#json-ld-processors.6")
 		if !strings.Contains(err.Error(), "alpha") {
 			t.Fatalf("the first undefined term is the method's additional property: %v", err)
 		}
 	})
-	t.Run("core10#production-0.5 RejectUndefinedTerms in DID Core 1.0 JSON-LD", func(t *testing.T) {
+	t.Run("core10#production-0.5 by default the producer refuses undefined terms in DID Core 1.0 JSON-LD", func(t *testing.T) {
 		v10 := build(t, document.NewBuilder(mustDID(t, subject)).Relationship(vm.Authentication, vm.Embed(key(t, subject+"#k"))))
 		_, _, err := strict.Produce(v10, representation.ProduceOptions{Version: spec.V10, JSONLD: true})
 		wantError(t, err, "core10#production-0.5")
@@ -505,6 +505,15 @@ func TestUndefinedTerms(t *testing.T) {
 		_, _, err = strict.Produce(svc, representation.ProduceOptions{JSONLD: true})
 		wantError(t, err, "did11-cr20260305#json-ld-processors.6")
 	})
+	t.Run("core10#production-0.5 a DID Core 1.0 document that also names the v1.1 context is produced", func(t *testing.T) {
+		v10 := build(t, document.NewBuilder(mustDID(t, subject)).
+			RepresentationEntry("@context", mustList(t, document.String(spec.ContextURLV10), document.String(spec.ContextURLV11))).
+			Relationship(vm.Authentication, vm.Embed(key(t, subject+"#k"))))
+		got, _ := produce(t, strict, v10, representation.ProduceOptions{Version: spec.V10, JSONLD: true})
+		if !strings.HasPrefix(got, `{"@context":["https://www.w3.org/ns/did/v1","https://www.w3.org/ns/did/v1.1"],`) {
+			t.Fatal(got)
+		}
+	})
 	t.Run("the check is skipped for JSON and for contexts that are not known locally", func(t *testing.T) {
 		if _, _, err := strict.Produce(d, representation.ProduceOptions{}); err != nil {
 			t.Fatal(err)
@@ -514,9 +523,15 @@ func TestUndefinedTerms(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	t.Run("did11-cr20260305#production-and-consumption.10 without the option every entry is written", func(t *testing.T) {
-		got, _ := produce(t, New(), d, representation.ProduceOptions{JSONLD: true})
-		if !strings.Contains(got, `"fooExtension":42`) {
+	t.Run("did11-cr20260305#production-and-consumption.10 a refused document is not written with entries dropped", func(t *testing.T) {
+		data, mt, err := strict.Produce(d, representation.ProduceOptions{JSONLD: true})
+		if err == nil || data != nil || mt != "" {
+			t.Fatalf("got %s %s %v", data, mt, err)
+		}
+	})
+	t.Run("did11-cr20260305#production-and-consumption.10 AllowUndefinedTerms writes every entry", func(t *testing.T) {
+		got, _ := produce(t, New(AllowUndefinedTerms()), d, representation.ProduceOptions{JSONLD: true})
+		if !strings.Contains(got, `"fooExtension":42`) || !strings.Contains(got, `"alpha"`) {
 			t.Fatal(got)
 		}
 	})
