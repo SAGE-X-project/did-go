@@ -15,7 +15,9 @@
 //     Validate);
 //  5. the driver's Read runs: method.ErrNotFound is NOT_FOUND,
 //     method.ErrNotSupported (for example versionId on a method without
-//     versions) is FEATURE_NOT_SUPPORTED, method.ErrInvalidInput is
+//     versions) is FEATURE_NOT_SUPPORTED, method.ErrInvalidDocument (the
+//     driver obtained a document that does not conform or whose id is not
+//     the DID) is INVALID_DID_DOCUMENT, method.ErrInvalidInput is
 //     INVALID_DID, and any other failure is INTERNAL_ERROR. The document
 //     metadata the driver supplied is validated, before the deactivated
 //     check, and a violation is INVALID_DID_DOCUMENT (docs/12 §6.2). A
@@ -186,6 +188,8 @@ func read(ctx context.Context, m method.Method, d did.DID, opts resolution.Resol
 		return nil, resolution.NewError(resolution.CodeNotFound, fmt.Sprintf("%s does not exist", d))
 	case errors.Is(err, method.ErrNotSupported):
 		return nil, resolution.NewError(resolution.CodeFeatureNotSupported, "the DID method does not support the request: "+err.Error())
+	case errors.Is(err, method.ErrInvalidDocument):
+		return nil, resolution.NewError(resolution.CodeInvalidDIDDocument, "the DID method driver obtained an invalid DID document: "+err.Error())
 	case errors.Is(err, method.ErrInvalidInput):
 		return nil, resolution.NewError(resolution.CodeInvalidDID, "the DID does not conform to its method: "+err.Error())
 	case err != nil:

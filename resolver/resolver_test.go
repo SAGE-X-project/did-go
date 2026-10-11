@@ -3,6 +3,7 @@ package resolver_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -192,6 +193,20 @@ func TestResolutionAlgorithmErrors(t *testing.T) {
 		if res.ResolutionMetadata.Error.Title == "" {
 			t.Fatal("the error object is not empty")
 		}
+	})
+	t.Run(covers("res10-crd20261001#resolving.7", "a document the driver rejects as invalid is INVALID_DID_DOCUMENT"), func(t *testing.T) {
+		for _, err := range []error{
+			method.ErrInvalidDocument,
+			fmt.Errorf("fetched document id differs: %w", method.ErrInvalidDocument),
+			// A document error is more specific than an input error.
+			fmt.Errorf("%w: %w", method.ErrInvalidInput, method.ErrInvalidDocument),
+		} {
+			wantError(t, newResolver(t, fixture(testutil.Fail(err))).Resolve(ctx, testutil.MustDID(testutil.ExampleDID), resolution.ResolutionOptions{}), resolution.CodeInvalidDIDDocument)
+		}
+	})
+	t.Run("a DID the driver rejects as input stays INVALID_DID", func(t *testing.T) {
+		res := newResolver(t, fixture(testutil.Fail(method.ErrInvalidInput))).Resolve(ctx, testutil.MustDID(testutil.ExampleDID), resolution.ResolutionOptions{})
+		wantError(t, res, resolution.CodeInvalidDID)
 	})
 	t.Run("a method that does not support an option is FEATURE_NOT_SUPPORTED", func(t *testing.T) {
 		ns := newResolver(t, fixture(testutil.Fail(method.ErrNotSupported)))

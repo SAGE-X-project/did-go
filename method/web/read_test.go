@@ -163,7 +163,8 @@ func TestReadVerifiesDocumentID(t *testing.T) {
 		s, m := serveDoc(t, "application/json", func(s *testServer) string { return docJSON("did:web:attacker.example") })
 		err := readErr(t, m, s.did("example.com"))
 		var we *Error
-		if !errors.As(err, &we) || we.Code != CodeInvalidDidDocument || we.Statement != stmtVerifyID || !errors.Is(err, method.ErrInvalidInput) {
+		if !errors.As(err, &we) || we.Code != CodeInvalidDidDocument || we.Statement != stmtVerifyID ||
+			!errors.Is(err, method.ErrInvalidDocument) || errors.Is(err, method.ErrInvalidInput) {
 			t.Fatal(err)
 		}
 		if strings.Contains(err.Error(), "attacker") {
@@ -172,7 +173,7 @@ func TestReadVerifiesDocumentID(t *testing.T) {
 		for _, body := range []string{"", "null", "[]", "<html>error</html>", `{"id":1}`, `{}`,
 			docJSON(s.did("example.com")) + `{}`, docJSON(s.did("example.com")) + ` x`} {
 			_, m := serveDoc(t, "application/json", func(*testServer) string { return body })
-			if err := readErr(t, m, s.did("example.com")); !errors.Is(err, method.ErrInvalidInput) {
+			if err := readErr(t, m, s.did("example.com")); !errors.Is(err, method.ErrInvalidDocument) || errors.Is(err, method.ErrInvalidInput) {
 				t.Errorf("%q: %v", body, err)
 			}
 		}
@@ -199,7 +200,8 @@ func TestReadRejectsRelativeDIDURLs(t *testing.T) {
 		s, m := serveDoc(t, "application/json", func(s *testServer) string { return body(s.did("example.com")) })
 		err := readErr(t, m, s.did("example.com"))
 		var we *Error
-		if !errors.As(err, &we) || we.Statement != sectionKeys {
+		if !errors.As(err, &we) || we.Statement != sectionKeys || we.Code != CodeInvalidDidDocument ||
+			!errors.Is(err, method.ErrInvalidDocument) || errors.Is(err, method.ErrInvalidInput) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
@@ -476,7 +478,9 @@ func TestDocumentFile(t *testing.T) {
 	if err != nil || mt != spec.MediaTypeDID || string(data) != `{"id":"did:web:example.com:user:alice"}` {
 		t.Fatal(string(data), mt, err)
 	}
-	if _, _, err := New(stubProducer{rel: "#k"}, nil).DocumentFile(doc, representation.ProduceOptions{}); !errors.Is(err, method.ErrInvalidInput) {
+	var we *Error
+	if _, _, err := New(stubProducer{rel: "#k"}, nil).DocumentFile(doc, representation.ProduceOptions{}); !errors.Is(err, method.ErrInvalidInput) ||
+		!errors.As(err, &we) || we.Code != CodeInvalidDidDocument {
 		t.Fatal(err)
 	}
 	if _, _, err := New(stubProducer{err: errors.New("boom")}, nil).DocumentFile(doc, representation.ProduceOptions{}); err == nil {
@@ -485,7 +489,7 @@ func TestDocumentFile(t *testing.T) {
 	if _, _, err := New(nil, nil).DocumentFile(doc, representation.ProduceOptions{}); err == nil {
 		t.Fatal("no producer")
 	}
-	if _, _, err := New(stubProducer{}, nil).DocumentFile(nil, representation.ProduceOptions{}); err == nil {
+	if _, _, err := New(stubProducer{}, nil).DocumentFile(nil, representation.ProduceOptions{}); !errors.Is(err, method.ErrInvalidInput) {
 		t.Fatal("nil document")
 	}
 	keyDoc, _ := document.NewBuilder(mustDID(t, "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK")).Build()
@@ -501,5 +505,23 @@ func TestErrorText(t *testing.T) {
 	}
 	if raise(CodeNotFound, stmtGet, "y").Error() != "web: notFound: y (didweb-ea423c1#read-resolve.7)" {
 		t.Fatal("raise")
+	}
+}
+
+func TestErrorClasses(t *testing.T) {
+	classes := []error{method.ErrInvalidInput, method.ErrInvalidDocument, method.ErrNotFound, method.ErrNotSupported}
+	for code, want := range map[string]error{
+		CodeInvalidDid:         method.ErrInvalidInput,
+		CodeInvalidURL:         method.ErrInvalidInput,
+		CodeInvalidDidDocument: method.ErrInvalidDocument,
+		CodeNotFound:           method.ErrNotFound,
+		CodeFetchFailed:        nil,
+	} {
+		err := raise(code, stmtGet, "x")
+		for _, class := range classes {
+			if got := errors.Is(err, class); got != (class == want) {
+				t.Errorf("%s: errors.Is(%v) = %v", code, class, got)
+			}
+		}
 	}
 }
