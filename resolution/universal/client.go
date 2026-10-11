@@ -13,6 +13,7 @@ import (
 
 	"github.com/sage-x-project/did-go/did"
 	"github.com/sage-x-project/did-go/document"
+	"github.com/sage-x-project/did-go/internal/wire"
 	"github.com/sage-x-project/did-go/representation"
 	"github.com/sage-x-project/did-go/resolution"
 	"github.com/sage-x-project/did-go/spec"
@@ -86,7 +87,10 @@ func WithConsumeOptions(o representation.ConsumeOptions) ClientOption {
 //     requested DID is INVALID_DID_DOCUMENT.
 //   - Dereferenced content with a DID media type that the consumer accepts
 //     becomes a *document.Document; text/uri-list content becomes a []string;
-//     other content stays []byte.
+//     a JSON object under application/json or application/ld+json (a
+//     fragment, docs/07 §2.1) becomes a vm.Service, a vm.Method or a
+//     document.Map, as the dereferencer package returns it; other content
+//     stays []byte.
 //   - Error bodies are read as RFC 9457 objects. A response whose error cannot
 //     be read gets the error type of its status code (400 INVALID_DID or
 //     INVALID_DID_URL, 404 NOT_FOUND, 406 REPRESENTATION_NOT_SUPPORTED, 501
@@ -176,7 +180,7 @@ func (c *Client) Dereference(ctx context.Context, u did.DIDURL, opts resolution.
 	if e != nil {
 		return resolution.ErrorDereferenceResult(e)
 	}
-	return c.dereferencingResult(resp, data)
+	return c.dereferencingResult(resp, data, u.DID())
 }
 
 // encodeResolutionOptions returns the options other than accept as query
@@ -348,11 +352,11 @@ func (c *Client) consumeDocument(data []byte, ct string, d did.DID) resolution.R
 }
 
 // dereferencingResult turns a response into a dereferencing result.
-func (c *Client) dereferencingResult(resp *http.Response, data []byte) resolution.DereferenceResult {
+func (c *Client) dereferencingResult(resp *http.Response, data []byte, subject did.DID) resolution.DereferenceResult {
 	mt := mediaType(resp)
 	switch {
 	case mt == spec.MediaTypeDIDURLDereferencing:
-		return c.fullDereferencing(resp.StatusCode, data)
+		return c.fullDereferencing(resp.StatusCode, data, subject)
 	case resp.StatusCode == http.StatusSeeOther:
 		return seeOther(resp)
 	case resp.StatusCode == http.StatusGone:
@@ -360,7 +364,7 @@ func (c *Client) dereferencingResult(resp *http.Response, data []byte) resolutio
 	case resp.StatusCode == http.StatusOK:
 		ct := strings.TrimSpace(resp.Header.Get("Content-Type"))
 		return resolution.DereferenceResult{
-			ContentStream:         c.content(data, ct, false),
+			ContentStream:         c.content(data, ct, false, subject),
 			DereferencingMetadata: resolution.DereferencingMetadata{ContentType: ct},
 		}
 	default:
@@ -384,7 +388,7 @@ func seeOther(resp *http.Response) resolution.DereferenceResult {
 }
 
 // fullDereferencing reads an application/did-url-dereferencing body.
-func (c *Client) fullDereferencing(status int, data []byte) resolution.DereferenceResult {
+func (c *Client) fullDereferencing(status int, data []byte, subject did.DID) resolution.DereferenceResult {
 	var dr dereferencingResult
 	if err := json.Unmarshal(data, &dr); err != nil {
 		return resolution.ErrorDereferenceResult(resolution.NewError(resolution.CodeInternalError, "the dereferencing result is not valid: "+err.Error()))
@@ -403,14 +407,17 @@ func (c *Client) fullDereferencing(status int, data []byte) resolution.Dereferen
 	if isNull(raw) {
 		return resolution.ErrorDereferenceResult(resolution.NewError(resolution.CodeInternalError, "the dereferencing result has no content"))
 	}
-	out.ContentStream = c.content(raw, contentType(dr.DereferencingMetadata, dr.ContentMetadata), true)
+	out.ContentStream = c.content(raw, contentType(dr.DereferencingMetadata, dr.ContentMetadata), true, subject)
 	return out
 }
 
 // content converts dereferenced content: a document for a DID media type the
-// consumer accepts, a URL list for text/uri-list, bytes otherwise. inJSON
-// tells whether data is a JSON value of a dereferencing result.
-func (c *Client) content(data []byte, ct string, inJSON bool) any {
+// consumer accepts, a URL list for text/uri-list, a fragment (a JSON object
+// under application/json or application/ld+json) as a vm.Method, a
+// vm.Service or a document.Map, bytes otherwise. inJSON tells whether data
+// is a JSON value of a dereferencing result; subject is the DID of the
+// dereferenced DID URL.
+func (c *Client) content(data []byte, ct string, inJSON bool, subject did.DID) any {
 	if isURIList(ct) {
 		if inJSON {
 			var list []string
@@ -425,12 +432,67 @@ func (c *Client) content(data []byte, ct string, inJSON bool) any {
 			return uriList(string(data))
 		}
 	}
-	if mt, err := representation.NormalizeMediaType(ct); err == nil && representation.IsDIDMediaType(mt) {
+	mt, err := representation.NormalizeMediaType(ct)
+	switch {
+	case err != nil:
+	case representation.IsDIDMediaType(mt):
 		if doc, _, err := c.consumer.Consume(data, ct, c.cfg.consume); err == nil && doc != nil {
 			return doc
 		}
+	case representation.IsLowPrecision(mt): // application/json or application/ld+json
+		if v, ok := c.fragment(data, subject); ok {
+			return v
+		}
 	}
 	return bytes.Clone(data)
+}
+
+// fragment reads the JSON object that a fragment dereferences to, the
+// inverse of what Handler writes for the dereferencer's fragment content:
+// an object with serviceEndpoint is read as a vm.Service, one with type and
+// controller as a vm.Method, by consuming a DID document of subject that
+// holds only that object with the consumer given to NewClient (DID 1.1 JSON
+// production rules, no @context, so no entry is dropped). Any other object,
+// or one the consumer refuses, is a document.Map holding every member. It
+// reports false when data is not a JSON object.
+func (c *Client) fragment(data []byte, subject did.DID) (any, bool) {
+	n, err := wire.Parse(data, wire.Limits{MaxBytes: int(c.cfg.limit)})
+	if err != nil || n.Kind != wire.Object {
+		return nil, false
+	}
+	_, isService := n.Get(wire.PropServiceEndpoint)
+	_, hasType := n.Get(wire.PropType)
+	_, hasController := n.Get(wire.PropController)
+	switch {
+	case isService:
+		if doc := c.holding(subject, wire.PropService, n); doc != nil && len(doc.Services()) == 1 {
+			return doc.Services()[0], true
+		}
+	case hasType && hasController:
+		if doc := c.holding(subject, wire.PropVerificationMethod, n); doc != nil && len(doc.VerificationMethods()) == 1 {
+			return doc.VerificationMethods()[0], true
+		}
+	}
+	v, err := wire.ToValue(n)
+	if err != nil {
+		return nil, false
+	}
+	m, ok := v.(document.Map)
+	return m, ok
+}
+
+// holding consumes a DID document of subject whose property prop holds only
+// n, or returns nil.
+func (c *Client) holding(subject did.DID, prop string, n wire.Node) *document.Document {
+	root := wire.Node{Kind: wire.Object, Members: []wire.Member{
+		{Name: wire.PropID, Value: wire.StringNode(subject.String())},
+		{Name: prop, Value: wire.Node{Kind: wire.Array, Items: []wire.Node{n}}},
+	}}
+	doc, _, err := c.consumer.Consume(wire.Encode(root), spec.MediaTypeDID, c.cfg.consume)
+	if err != nil {
+		return nil
+	}
+	return doc
 }
 
 // uriList parses a text/uri-list body (RFC 2483 §5): one URI per line,
