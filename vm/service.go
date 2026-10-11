@@ -8,12 +8,16 @@ type Service struct {
 	// ID is the service id, or "" when absent. CID 1.0 makes it optional;
 	// DID Core 1.0 requires it (document.Validate with spec.V10).
 	ID string
-	// Type is the service type: one string, or a set of strings when it has
-	// more than one element.
+	// Type is the service type: one string or a set of strings.
 	Type []string
-	// ServiceEndpoint is one endpoint, or a set when it has more than one
-	// element.
+	// TypeShape records whether type is a single string or a set.
+	// ShapeDefault writes a single string for one element.
+	TypeShape Shape
+	// ServiceEndpoint is one endpoint or a set of endpoints.
 	ServiceEndpoint []Endpoint
+	// EndpointShape records whether serviceEndpoint is a single value or a
+	// set. ShapeDefault writes a single value for one element.
+	EndpointShape Shape
 	// Extra holds additional properties (CID 1.0 §2.1.4 "MAY include
 	// additional properties"), as JSON values.
 	Extra map[string]any
@@ -45,7 +49,8 @@ func (s Service) Clone() Service {
 
 // Validate applies the CID 1.0 §2.1.4 rules: an id, if present, is a URL;
 // type is a string or a set of strings; serviceEndpoint is a string, a map or
-// a set of strings and maps; each string is a valid URL. The DID Core 1.0
+// a set of strings and maps; each string is a valid URL; a ShapeSingle
+// property has exactly one element. The DID Core 1.0
 // rules for id and endpoint strings are applied by document.Validate.
 func (s Service) Validate() error {
 	if s.ID != "" && !IsURL(s.ID) {
@@ -64,6 +69,9 @@ func (s Service) checkType() error {
 	if len(s.Type) == 0 {
 		return errorf("type", "cid10#services.8", "a service has a type")
 	}
+	if err := CheckShape("type", "cid10#services.9", s.TypeShape, len(s.Type)); err != nil {
+		return err
+	}
 	for i, t := range s.Type {
 		if t == "" {
 			return errorf("type", "cid10#services.9", "a service type is a non-empty string")
@@ -78,6 +86,9 @@ func (s Service) checkType() error {
 func (s Service) checkEndpoints() error {
 	if len(s.ServiceEndpoint) == 0 {
 		return errorf("serviceEndpoint", "cid10#services.11", "a service has a serviceEndpoint")
+	}
+	if err := CheckShape("serviceEndpoint", "cid10#services.12", s.EndpointShape, len(s.ServiceEndpoint)); err != nil {
+		return err
 	}
 	for _, e := range s.ServiceEndpoint {
 		switch {

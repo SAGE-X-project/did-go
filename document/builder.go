@@ -31,6 +31,7 @@ func relationshipStatement(p vm.Purpose) string {
 type Builder struct {
 	id            did.DID
 	controllers   []did.DID
+	ctrlShape     vm.Shape
 	alsoKnownAs   []string
 	methods       []vm.Method
 	relationships [6][]vm.Relationship
@@ -47,8 +48,8 @@ func NewBuilder(id did.DID) *Builder { return &Builder{id: id} }
 // NewBuilderFrom starts a builder with every property of d.
 func NewBuilderFrom(d *Document) *Builder {
 	b := &Builder{
-		id: d.id, controllers: slices.Clone(d.controllers), alsoKnownAs: slices.Clone(d.alsoKnownAs),
-		methods: cloneMethods(d.methods), services: d.Services(),
+		id: d.id, controllers: slices.Clone(d.controllers), ctrlShape: d.ctrlShape,
+		alsoKnownAs: slices.Clone(d.alsoKnownAs), methods: cloneMethods(d.methods), services: d.Services(),
 		extensions: d.extensions.Entries(), repr: d.repr.Entries(),
 	}
 	for _, p := range vm.Purposes() {
@@ -61,6 +62,15 @@ func NewBuilderFrom(d *Document) *Builder {
 // Controller adds DID controllers.
 func (b *Builder) Controller(c ...did.DID) *Builder {
 	b.controllers = append(b.controllers, c...)
+	return b
+}
+
+// ControllerShape sets whether the controller property is written as a
+// single string or as a set. Without it, Build writes a single string for one
+// controller and a set for more; vm.ShapeSet with no controller is the empty
+// set "controller": [].
+func (b *Builder) ControllerShape(s vm.Shape) *Builder {
+	b.ctrlShape = s
 	return b
 }
 
@@ -143,8 +153,14 @@ func (b *Builder) document() (*Document, error) {
 		id: b.id, controllers: slices.Clone(b.controllers), alsoKnownAs: slices.Clone(b.alsoKnownAs),
 		methods: cloneMethods(b.methods), extensions: ext, repr: repr,
 	}
+	if len(b.controllers) > 0 || b.ctrlShape == vm.ShapeSet {
+		d.ctrlShape = b.ctrlShape.Resolve(len(b.controllers))
+	}
 	for _, s := range b.services {
-		d.services = append(d.services, s.Clone())
+		c := s.Clone()
+		c.TypeShape = s.TypeShape.Resolve(len(s.Type))
+		c.EndpointShape = s.EndpointShape.Resolve(len(s.ServiceEndpoint))
+		d.services = append(d.services, c)
 	}
 	for _, p := range vm.Purposes() {
 		if b.present[p] {
@@ -162,6 +178,9 @@ func (b *Builder) checkSubject() error {
 }
 
 func (b *Builder) checkControllers() error {
+	if err := vm.CheckShape("controller", "core10#did-controller.2", b.ctrlShape, len(b.controllers)); err != nil {
+		return invalidDoc("controller", "core10#did-controller.2", "%v", err)
+	}
 	for i, c := range b.controllers {
 		if c.IsZero() {
 			return invalidDoc("controller", "core10#did-controller.2", "a controller is a DID")

@@ -102,6 +102,21 @@ STATEMENT_OWNERS = {
     # Producer and consumer obligations on serialized documents.
     "core10#services.6": ["producer"], "core10#services.7": ["consumer"],
     "cid10#JsonWebKey.12": ["producer"],
+    # DID 1.1 §6.2.3 mixes producer and consumer sentences under one section.
+    # Serializing with @context, its value, the undefined-term SHOULD NOT and
+    # the media type are production rules; dropping undefined terms is a
+    # consumption rule. Statement 1 (@context per JSON-LD 1.1) binds both.
+    "did11#json-ld-processors.2": ["producer"],
+    "did11#json-ld-processors.3": ["producer"],
+    "did11#json-ld-processors.4": ["producer"],
+    "did11#json-ld-processors.6": ["producer"],
+    "did11#json-ld-processors.7": ["producer"],
+    "did11#json-ld-processors.8": ["consumer"],
+    # Treating a context as already retrieved with a pinned digest is done by
+    # the jsonld tool, which embeds the contexts and checks their SHA-256 for
+    # both players (docs/14 §2); neither player fetches or holds a context.
+    "did11#remote-resource-integrity.1": ["jsonld"],
+    "cid10#json-ld-context.1": ["jsonld"],
     # Key format conversion happens in the key codecs.
     "cid10#verification-material.2": ["crypto"],
     "cid10#verification-material.3": ["crypto"],
