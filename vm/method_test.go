@@ -431,6 +431,7 @@ func TestMultikey(t *testing.T) {
 		{"cid10#Multikey.21 BLS12-381 G2 secret key: base-58-btc with header z", "BLS12-381-G2", true, false},
 		{"cid10#Multikey.22 SM2 secret key: prefix 0x9026 and 32 bytes", "SM2", true, true},
 		{"cid10#Multikey.23 SM2 secret key: base-58-btc with header z", "SM2", true, false},
+		{"didkey-2cc490c#encryption-method-creation-algorithm.3 X25519 public key: prefix 0xec01 and 32 bytes", "X25519", false, true},
 		{"P-384 public key: base-58-btc with header z (stated without MUST)", "P-384", false, false},
 		{"P-384 secret key: base-58-btc with header z (stated without MUST)", "P-384", true, false},
 	}
@@ -438,7 +439,7 @@ func TestMultikey(t *testing.T) {
 		t.Run(r.name, func(t *testing.T) {
 			c := codecFor(t, r.key, r.secret)
 			id, _, _ := strings.Cut(r.name, " ")
-			if strings.HasPrefix(id, "cid10#") && id != c.PrefixStatement && id != c.EncodingStatement {
+			if strings.Contains(id, "#") && id != c.PrefixStatement && id != c.EncodingStatement {
 				t.Fatalf("row cites %s/%s", c.PrefixStatement, c.EncodingStatement)
 			}
 			if r.prefix {

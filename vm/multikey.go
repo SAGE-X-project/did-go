@@ -31,6 +31,11 @@ type MultikeyCodec struct {
 // The BLS12-381 G2 secret key row states the prefix 0x8030 and calls it the
 // varint expression of 0x130a, whose varint is 0x8a26. Both prefixes are
 // listed so that either reading is accepted.
+//
+// The X25519 public key row is not part of CID 1.0. It is the x25519-pub
+// multicodec (0xec, varint 0xec01) that the did:key specification uses for
+// key agreement methods; CID 1.0 §2.2.2 lets other specifications define
+// header values for other key types.
 func MultikeyCodecs() []MultikeyCodec {
 	return []MultikeyCodec{
 		{"P-256", [2]byte{0x80, 0x24}, 33, false, "cid10#Multikey.6", "cid10#Multikey.7"},
@@ -38,6 +43,7 @@ func MultikeyCodecs() []MultikeyCodec {
 		{"Ed25519", [2]byte{0xed, 0x01}, 32, false, "cid10#Multikey.9", "cid10#Multikey.10"},
 		{"BLS12-381-G2", [2]byte{0xeb, 0x01}, 96, false, "cid10#Multikey.11", "cid10#Multikey.12"},
 		{"SM2", [2]byte{0x86, 0x24}, 33, false, "cid10#Multikey.13", "cid10#Multikey.14"},
+		{"X25519", [2]byte{0xec, 0x01}, 32, false, "didkey-2cc490c#encryption-method-creation-algorithm.3", ""},
 		{"P-256", [2]byte{0x86, 0x26}, 32, true, "cid10#Multikey.15", "cid10#Multikey.16"},
 		{"P-384", [2]byte{0x87, 0x26}, 48, true, "cid10#Multikey.17", ""},
 		{"Ed25519", [2]byte{0x80, 0x26}, 32, true, "cid10#Multikey.18", "cid10#Multikey.19"},

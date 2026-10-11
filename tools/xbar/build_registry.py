@@ -2,7 +2,8 @@
 """Build conformance/requirements.json from extracted statements and review decisions.
 
 Inputs:
-  STATEMENTS_DIR  {core10,did11,cid10,res10}.json from extract_spec.py
+  STATEMENTS_DIR  {core10,did11,cid10,res10,didkey}.json from extract_spec.py
+                  (didkey.json is extracted with --respec)
   COVERAGE_JSON   one or more coverage verdict files ({"id","decision","reason"})
   LINKED_JSON     a JSON list of statement ids that the design restates (from compare.py)
 
@@ -22,6 +23,7 @@ KEYS = {
     "did11": "did11-cr20260305",
     "cid10": "cid10",
     "res10": "res10-crd20261001",
+    "didkey": "didkey-2cc490c",
 }
 
 SPEC_AUTHOR = {"method-syntax", "method-operations", "security-requirements",
@@ -69,6 +71,15 @@ OWNERS = {
     "resolver-architectures-proxied": ["resolution/universal"],
     "errors": ["resolution"], "bindings-https": ["resolution/universal"],
     "caching": ["resolution/cache"],
+    # did:key (didkey-2cc490c): the driver runs the algorithms; the JWK
+    # encoding of a public key is a key codec.
+    "document-creation-algorithm": ["method/key"],
+    "signature-method-creation-algorithm": ["method/key"],
+    "decode-public-key-algorithm": ["method/key"],
+    "encode-jwk-algorithm": ["crypto"],
+    "encryption-method-creation-algorithm": ["method/key"],
+    "derive-encryption-key-algorithm": ["method/key"],
+    "context-creation-algorithm": ["method/key"],
 }
 
 
@@ -140,6 +151,8 @@ STATEMENT_OWNERS = {
     "res10#did-document-metadata.2": ["method/key", "method/web"],
     "res10#did-document-metadata.4": ["method/key", "method/web"],
     "res10#did-document-metadata.10": ["method/key", "method/web"],
+    # The Ed25519 to X25519 conversion is key arithmetic: key codecs.
+    "didkey#derive-encryption-key-algorithm.5": ["crypto"],
 }
 
 # Statements addressed to specification authors outside the sections listed
@@ -148,6 +161,14 @@ SPEC_AUTHOR_IDS = {
     "cid10#Multikey.24",
     "res10#did-document-metadata.17", "res10#did-document-metadata.22",
     "res10#did-url-content-metadata.1",
+}
+
+
+# Statements extracted as algorithm steps that state no requirement, with the
+# reason recorded in the registry.
+OUT_OF_SCOPE_IDS = {
+    "didkey#signature-method-creation-algorithm.5":
+        "informative: explains how the previous sentence is usually met and states no requirement",
 }
 
 
@@ -200,6 +221,8 @@ def main():
                 scope, reason = "out-of-scope", "informative"
             elif s["section"] in SPEC_AUTHOR or s["id"] in SPEC_AUTHOR_IDS:
                 scope, reason = "out-of-scope", "spec-author"
+            elif s["id"] in OUT_OF_SCOPE_IDS:
+                scope, reason = "out-of-scope", OUT_OF_SCOPE_IDS[s["id"]]
             elif decision.get("decision") == "OUT_OF_SCOPE":
                 scope, reason = "out-of-scope", decision.get("reason", "")
             elif not owners:
