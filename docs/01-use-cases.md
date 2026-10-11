@@ -88,7 +88,7 @@ flowchart LR
   3. When adding a VM, `id` (DID URL), `type` and `controller` (DID) are required; validate that there is at most one public key material property (`publicKeyMultibase`, `publicKeyJwk`) and at most one secret key material property. The type decides which material is used, and a VM without public key material cannot verify proofs.
   4. When adding a Service, `type` and `serviceEndpoint` (URL validated) are required; `id` is optional (if present, unique within the document; required when the production target is V10, see FR-V3).
   5. If validation passes, return an immutable DID document.
-- **Alternatives:** 3a. Two properties for the same material (`publicKeyJwk` with `publicKeyMultibase`, or `secretKeyJwk` with `secretKeyMultibase`): `ErrKeyFormatConflict`. 4a. Endpoint string is not a valid URL: `ErrInvalidServiceEndpoint`.
+- **Alternatives:** 3a. Two properties for the same material (`publicKeyJwk` with `publicKeyMultibase`, or `secretKeyJwk` with `secretKeyMultibase`): `*vm.Error` from `Builder.Build`. 4a. Endpoint string is not a valid URL: `*vm.Error` from `Builder.Build`.
 
 ### UC-3: Produce a Representation
 - **Actors:** App Developer, Controller, Resolver
@@ -177,16 +177,16 @@ flowchart LR
   2. If an element is a reference (DID URL string), look up the embedded VM in `verificationMethod` (making relative URLs absolute).
   3. If an element is an embedded VM, use it as is.
   4. Parse the key format (`publicKeyMultibase`/`publicKeyJwk`) and use it for verification.
-- **Alternative:** Reference not found in the document: `ErrDanglingReference`.
+- **Alternative:** If the reference is not in the document, `document.SelectMethod` returns a `*document.ConformanceError` (`INVALID_VERIFICATION_METHOD`).
 
 ### UC-11: Register a DID Method
 - **Actors:** App Developer
 - **FR:** FR-M6, NFR-2
 - **Main flow:**
-  1. Call `Registry.Register(methodName, methodImpl)`.
-  2. Check for a duplicate method-name.
-  3. Subsequent Resolve/CRUD calls are routed to that method.
-- **Alternative:** Duplicate registration: `ErrMethodAlreadyRegistered`.
+  1. Call `method.NewRegistry(drivers...)` with every driver. The registry does not change after it is built.
+  2. `NewRegistry` checks for a duplicate method-name.
+  3. Subsequent Resolve and CRUD calls are routed to that method.
+- **Alternative:** If the same method-name is given twice, or a nil driver or a name that is not a method-name is given, `NewRegistry` returns an error.
 
 ### UC-12: v1.0 Interop
 - **Actors:** Verifier, Legacy Client (v1.0 consumer / Universal Resolver client), App Developer
@@ -194,14 +194,14 @@ flowchart LR
 - **Precondition:** None (the core always accepts both versions)
 - **Main flow:**
   1. **Consume a v1.0 document**: input with `did+json`/`did+ld+json`, or low-precision input with `@context[0]==…/did/v1`, is detected as V10 and normalized into the single core model (extension of UC-4).
-  2. **Produce a v1.0 document**: specify `SpecVersion=V10` to serialize with the v1 context and a legacy media type. Documents without `service.id` are rejected (v1.0 §5.4 MUST).
-  3. **v1.0 contract resolution**: a legacy client calls `compat.V10Resolver.resolveRepresentation()`, which performs an internal v1.1 resolve (the core transcodes to the V10 representation to match accept) and RFC9457 to string error mapping (`09` §6.1).
+  2. **Produce a v1.0 document**: set `ProduceOptions.Version` to `spec.V10` to serialize with the v1 context and a legacy media type. Documents without `service.id` are rejected (v1.0 §5.4 MUST).
+  3. **v1.0 contract resolution**: a legacy client calls `compat.V10Resolver.ResolveRepresentation()`, which performs an internal v1.1 resolve (the core transcodes to the V10 representation to match accept) and RFC9457 to string error mapping (`09` §6.1).
   4. The detected version is reported to the caller as `ConsumeInfo.DetectedVersion`.
 - **Alternatives:**
   - 2a. Target is V10 but `service.id` is missing: `ConformanceError`.
   - 3a. `serviceType` parameter used on the v1.0 path: `featureNotSupported` (string).
   - 3b. `hl` parameter: accepted by the adapter (not passed to the core, `09` §6.2).
-  - 3c. The accept representation cannot be produced: `representationNotSupported` (string, v1.0 §7.1.2). The core returns `FEATURE_NOT_SUPPORTED` as the value `resolution.ErrAcceptNotSupported`, and the adapter maps it (`09` §6.1).
+  - 3c. The accept representation cannot be produced: `representationNotSupported` (string, v1.0 §7.1.2). The core returns the `FEATURE_NOT_SUPPORTED` error made by `resolution.NewAcceptNotSupported`, and the adapter recognizes it with `IsAcceptNotSupported` and maps it (`09` §6.1).
 
 ---
 

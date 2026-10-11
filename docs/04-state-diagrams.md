@@ -71,7 +71,7 @@ stateDiagram-v2
     direction LR
     state "Produce (UC-3)" as P {
         [*] --> P_Assert
-        P_Assert --> P_Reject: non-conforming document (V10 target uses ProfileV10: service.id required)
+        P_Assert --> P_Reject: non-conforming document (for a V10 target document.Validate(d, spec.V10) requires service.id)
         P_Assert --> P_Strip: conforming
         P_Strip --> P_Context: secretKey* removed
         P_Context --> P_Encode: if JSON-LD, inject version-specific @context (v1 / v1.1)
@@ -112,6 +112,8 @@ stateDiagram-v2
     OptionCheck --> Reading: options validated
     Reading --> ErrNotFound: not in VDR
     Reading --> ErrFeatureNotSupported: driver does not support an option (ErrNotSupported, for example versionTime)
+    Reading --> ErrInvalidDoc: driver obtained an invalid document (ErrInvalidDocument)
+    Reading --> ErrInvalidDid: the DID does not conform to its method (ErrInvalidInput)
     Reading --> ErrInternal: other driver error
     ErrInternal --> [*]: error.type=…#INTERNAL_ERROR (500)
     Reading --> ErrInvalidDoc: driver metadata violation (checked before deactivated, 12 §6.2)
@@ -119,7 +121,7 @@ stateDiagram-v2
     Reading --> Consuming: raw document obtained
     Consuming --> ErrInvalidDoc: consumption failed
     Consuming --> Resolved: Document created
-    Consuming --> ErrFeatureNotSupported: no acceptable representation can be produced (ErrAcceptNotSupported, 12 §6.2 step 4)
+    Consuming --> ErrFeatureNotSupported: no acceptable representation can be produced (resolution.NewAcceptNotSupported, 12 §6.2 step 4)
 
     Resolved --> [*]: doc + meta{contentType = media type of the bytes returned in Raw (12 §6.2)}
     Deactivated --> [*]: didDocument=null + docMeta{deactivated:true} (HTTP 410, not an error)
@@ -154,7 +156,7 @@ stateDiagram-v2
     Ready --> NoKey: no public key material (conforming, but cannot verify proofs)
     KeyParse --> [*]: used for verification
     NoKey --> [*]: not used for proof verification
-    Dangling --> [*]: ErrDanglingReference
+    Dangling --> [*]: document.ConformanceError (INVALID_VERIFICATION_METHOD)
 ```
 
 ---

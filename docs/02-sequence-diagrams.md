@@ -39,25 +39,20 @@ sequenceDiagram
     autonumber
     actor Dev as App Developer
     participant B as document.Builder
-    participant Val as document.Validator
 
     Dev->>B: NewBuilder(did)
-    Dev->>B: AddVerificationMethod(vm)
-    B->>Val: check vm.id is DID-URL, controller is DID
-    B->>Val: at most one public key material property, at most one secret key material property (type decides material, no public key material means no proof verification)
-    alt two or more properties for the same material
-        Val-->>B: ErrKeyFormatConflict
-        B-->>Dev: error
-    else ok
-        Val-->>B: ok
-    end
-    Dev->>B: AddService(svc)
-    B->>Val: check serviceEndpoint URL validity
-    Dev->>B: AddAuthentication("#key-1")  %% by reference
+    Dev->>B: VerificationMethod(m)
+    Dev->>B: Service(svc)
+    Dev->>B: Relationship(authentication, vm.Ref("#key-1"))  %% by reference
     Dev->>B: Build()
-    B->>Val: validate whole document (id required, sets unique)
-    Val-->>B: ok
-    B-->>Dev: Document (immutable)
+    B->>B: check vm.id is a DID URL and controller is a DID
+    B->>B: at most one public key material property, at most one secret key material property (type decides material, no public key material means no proof verification)
+    B->>B: check document id required, serviceEndpoint URL validity, sets unique (Build does not require service.id)
+    alt a rule is violated
+        B-->>Dev: *document.ConformanceError (vm check errors are converted to it, keeping the statement id)
+    else ok
+        B-->>Dev: Document (immutable)
+    end
 ```
 
 ---
@@ -72,10 +67,10 @@ sequenceDiagram
     participant JSON as json encoder
     participant LD as jsonld rules
 
-    Dev->>Prod: Produce(doc, opts{SpecVersion, JSONLD:true, IncludeSecret:false})
+    Dev->>Prod: Produce(doc, opts{Version, JSONLD:true, IncludeSecret:false})
     Prod->>Prod: assert doc is conforming (else refuse)
-    opt SpecVersion == V10
-        Prod->>Prod: ProfileV10 check (service.id required, warn on undefined properties, see 09 §5)
+    opt Version == spec.V10
+        Prod->>Prod: document.Validate(d, spec.V10) check. service.id required, warn on undefined properties and types (09 §5)
     end
     Prod->>Prod: drop secretKey* unless IncludeSecret
     alt JSON-LD
@@ -103,7 +98,7 @@ sequenceDiagram
     Cons->>JSON: decode root
     alt root is not a JSON Object
         JSON-->>Cons: not object
-        Cons-->>Verifier: ErrNonConforming
+        Cons-->>Verifier: *consumer.Error
     else
         JSON-->>Cons: object
         Cons->>Cons: settle version: the DID media type decides (did+json, did+ld+json→V10, did→V11). For did+ld+json and did, a @context that does not fit the type is an error. A non-v1 @context on did+json is recorded in UnexpectedContext (error under Strict). Low-precision→@context[0], else Expected or VUnknown (09 §4 steps 1 to 5)
@@ -126,14 +121,14 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor Verifier
-    participant R as resolution.Resolver
+    participant R as resolver.DefaultResolver
     participant Reg as method.Registry
     participant M as Method(example)
     participant VDR as Verifiable Data Registry
     participant Cons as representation.Consumer
 
-    Verifier->>R: Resolve(did, resolutionOptions)
-    R->>R: Parse(did)  %% UC-1
+    Verifier->>R: ResolveString(did, resolutionOptions)  %% Resolve takes a parsed did.DID
+    R->>R: did.Parse(did)  %% UC-1
     alt invalid syntax
         R-->>Verifier: null, meta{error.type=…#INVALID_DID}, {}
     else
@@ -159,6 +154,12 @@ sequenceDiagram
                 else driver does not support an option (for example versionTime)
                     M-->>R: ErrNotSupported
                     R-->>Verifier: null, meta{error.type=…#FEATURE_NOT_SUPPORTED}, {}
+                else driver obtained an invalid document
+                    M-->>R: ErrInvalidDocument
+                    R-->>Verifier: null, meta{error.type=…#INVALID_DID_DOCUMENT}, {}
+                else the DID does not conform to its method
+                    M-->>R: ErrInvalidInput
+                    R-->>Verifier: null, meta{error.type=…#INVALID_DID}, {}
                 else other driver error
                     M-->>R: error
                     R-->>Verifier: null, meta{error.type=…#INTERNAL_ERROR}, {}
@@ -173,7 +174,7 @@ sequenceDiagram
                     R->>Cons: Consume(Data, ContentType)
                     Cons-->>R: Document + ConsumeInfo (INVALID_DID_DOCUMENT on failure)
                     R->>R: accept negotiation, transcode if needed. contentType is the media type of the bytes returned in Raw: for driver bytes the driver's DID media type (for low-precision, the precise type of the detected representation), after transcoding the produced type (12 §6.2)
-                    alt no acceptable representation can be produced (ErrAcceptNotSupported)
+                    alt no acceptable representation can be produced (resolution.NewAcceptNotSupported)
                         R-->>Verifier: null, meta{error.type=…#FEATURE_NOT_SUPPORTED}, {}
                     else
                         R-->>Verifier: Result{doc, Raw, Info, Source, resolutionMeta{contentType}, docMeta}
@@ -289,19 +290,19 @@ sequenceDiagram
     autonumber
     actor V as Verifier
     participant Doc as Document
-    participant Sel as document.Selector
+    participant Sel as document.SelectMethod
 
     V->>Doc: Relationship(Authentication)
     Doc-->>V: [ "#key-1" (ref) | VM(embedded) ]
     loop each entry
         alt referenced (string)
-            V->>Sel: resolveRef(doc, "#key-1")
-            Sel->>Sel: absolutize relative DID URL
+            V->>V: absolutize the relative DID URL against doc.ID()
+            V->>Sel: SelectMethod(doc, did#key-1, vm.Authentication)
             Sel->>Doc: find verificationMethod by id
             alt not found
-                Doc-->>V: ErrDanglingReference
+                Sel-->>V: *document.ConformanceError (INVALID_VERIFICATION_METHOD)
             else
-                Doc-->>V: VerificationMethod
+                Sel-->>V: *vm.Method
             end
         else embedded (map)
             V->>V: use inline VM
@@ -323,11 +324,11 @@ sequenceDiagram
     participant C10 as compat.V10Resolver
     participant R as resolution.Resolver (v1.1 core)
 
-    L->>C10: resolveRepresentation(did, {accept:"application/did+ld+json"})
+    L->>C10: ResolveRepresentation(did, {accept:"application/did+ld+json"})
     C10->>R: Resolve(did, opts)  %% accept passed unchanged
     R->>R: consume and validate driver bytes, transcode to V10 if they do not match accept, record Source (12 §6.2)
     R-->>C10: Result{doc, Raw, Source, resolutionMeta, docMeta}
-    alt accept representation cannot be produced (ErrAcceptNotSupported)
+    alt accept representation cannot be produced (IsAcceptNotSupported)
         C10-->>L: meta{error:"representationNotSupported"}, null, {}  %% v1.0 §7.1.2
     else RFC9457 error
         C10->>C10: map type URL → string code (…#NOT_FOUND → "notFound", 09 §6.1)

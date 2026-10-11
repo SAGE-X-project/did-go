@@ -103,11 +103,15 @@ Duplicate fragments with the same id lead to undefined behavior (avoid them). Fr
 | ECDSA P-384 | `0x8124` | 49 (compressed) | 51 |
 | BLS12-381 G2 | `0xeb01` | 96 | 98 |
 | SM2 | `0x8624` | 33 | 35 |
+| X25519 (outside CID 1.0, used by did:key) | `0xec01` | 32 | 34 |
 
 **Secret key prefixes:** Ed25519 `0x8026` (34), P-256 `0x8626` (34), P-384 `0x8726` (50), BLS12-381 G2 `0x8030` (98), SM2 `0x9026` (34).
 
+The BLS12-381 G2 secret key row gives the prefix `0x8030` and calls it "the varint expression of 0x130a", but the varint of `0x130a` is `0x8a26`. `vm` therefore accepts both `0x8030` and `0x8a26` as the secret key prefix of this key type (`08` T9). did-go produces no BLS12-381 secret keys.
+
 - An unknown header, or a value that is not a public key header where a public key is expected, **raises an error** (line 1528).
 - **Alternative encodings MUST NOT be defined** for key types that are already defined (line 1537).
+- The X25519 row is not in the CID 1.0 table. It is the x25519-pub multicodec (`0xec`, varint `0xec01`) that the did:key specification uses for key agreement methods. CID 1.0 §2.2.2 lets other specifications define header values for other key types, so did-go keeps this row in the `vm` table and validates the X25519 key agreement method that did:key derives. `crypto` uses X25519 keys for key agreement only, never for signature verification.
 - The Multibase form of a `publicKeyMultibase` value is checked for every VM type. DID Core 1.0 §5.2.1 requires the value to be a string representation of a Multibase-encoded public key (MUST), and the DID 1.1 property table sets the same constraint. So even for a type other than Multikey (for example v1.0 `Ed25519VerificationKey2020`), a value that is not a string, whose first character is not a Multibase header, or whose header is `z` or `u` but whose remaining characters do not decode in that alphabet, is a conformance error. For type `Multikey` the header MUST be `z`, and any other header is an error, because the CID §2.2.2 public key table encodes each key type with the base-58-btc alphabet and prepends the base-58-btc Multibase header (`z`) (MUST in the P-256, Ed25519, BLS12-381 and SM2 rows; the P-384 row states the same with "is then encoded"). Accepting other headers that did-go cannot decode, with a warning, applies only to types other than `Multikey`, and such values are not used to verify proofs. A type with no registered codec, whose key bytes did-go cannot interpret, still goes through the form check.
 
 ## 6. JsonWebKey (§2.2.3)
@@ -136,7 +140,7 @@ Each relationship is OPTIONAL. Its value is **a set of one or more VMs**. Each e
 
 Authentication versus authorization: `authentication` ("who are you?") is not the same as `capabilityInvocation` / `capabilityDelegation` ("are you allowed?"). Using **different VMs** for them is recommended.
 
-**VMs in DID controller documents (DID Core 1.0 §5.1.2, SHOULD):** when a DID document has a `controller` property, the VMs contained in the DID documents of those controller DIDs SHOULD be accepted as authoritative for the subject. A proof that satisfies such a VM is treated as equivalent to a proof provided by the DID subject. The same section also says the controller documents SHOULD contain verification relationships that state which VMs may be used for which purposes. This sentence exists only in v1.0. DID 1.1 §5.1.2 delegates the controller definition to CID §2.1.2, and CID has no such sentence. So did-go supports this lookup only for ProfileV10 documents. `document.ResolveRef` looks only inside the subject document (`05` §3.5). A caller that has a resolver opts into the lookup by resolving each controller DID and running `ResolveRef` again on that document with the same verification relationship.
+**VMs in DID controller documents (DID Core 1.0 §5.1.2, SHOULD):** when a DID document has a `controller` property, the VMs contained in the DID documents of those controller DIDs SHOULD be accepted as authoritative for the subject. A proof that satisfies such a VM is treated as equivalent to a proof provided by the DID subject. The same section also says the controller documents SHOULD contain verification relationships that state which VMs may be used for which purposes. This sentence exists only in v1.0. DID 1.1 §5.1.2 delegates the controller definition to CID §2.1.2, and CID has no such sentence. So did-go supports this lookup only for DID Core 1.0 documents (requirement `core10#did-controller.4`). The pure selector `document.SelectMethod` looks only inside the subject document (`05` §3.5). The lookup is done by the `relyingparty` player. `RelyingParty.VerificationMethod` runs the CID Retrieve VM algorithm of §3 over a `resolution.Dereferencer`: it dereferences the document URL without the fragment, refuses a deactivated DID and a document that does not conform or whose `id` is not that URL, and leaves the remaining steps to `document.SelectMethod`. A revoked or expired VM is refused as well (CID §2.2). `VerificationMethodFor(subject, ref, p)` also checks that the VM speaks for the subject: ref must be a VM of the subject's own document. With `WithControllerDocuments()` and a DID Core 1.0 subject document, a VM in the document of a DID listed in the subject's `controller` is accepted too, and that VM must then be in verification relationship p of the controller's document. The option is opt-in. The subject document's version is set with `WithVersion`, or else taken from the detection result of the resolver given with `WithResolver`. `relyingparty.New` returns an error for `WithControllerDocuments()` when the DID Core 1.0 profile can never apply (another version is set, or there is neither a version nor a resolver).
 
 ## 8. Service (§2.1.4)
 
@@ -152,9 +156,9 @@ Each service map **MUST contain** `type` and `serviceEndpoint`. `id` is OPTIONAL
 
 **Additional properties (CID §2.1.4, DID Core 1.0 §5.4, MAY):** a service extension MAY include additional properties and MAY further restrict the properties associated with the extension. `vm.Service` keeps every property other than `id`, `type` and `serviceEndpoint` in an `Extra` map. The Consumer fills it and the Producer writes it back unchanged.
 
-**Version differences (DID Core 1.0 §5.4):** the table above gives the CID and DID 1.1 rules and applies under ProfileV11. Under ProfileV10, and when consuming a document detected as V10, the v1.0 rules apply.
+**Version differences (DID Core 1.0 §5.4):** the table above gives the CID and DID 1.1 rules and applies to V11 validation (`document.Validate(d, spec.V11)`). In V10 validation (`document.Validate(d, spec.V10)`), and when consuming a document detected as V10, the v1.0 rules apply.
 - `id` is required and MUST be a URI conforming to RFC 3986, of any scheme. For example `urn:uuid:…` is accepted. A producer MUST NOT produce multiple services with the same `id`, and a consumer MUST produce an error if it detects such a duplicate.
-- Every string value of `serviceEndpoint` MUST be a valid URI conforming to RFC 3986 and normalized per RFC 3986 §6 (Normalization and Comparison) and the normalization rules of its scheme specification. `ValidateProfile(d, ProfileV10)` reports a string that is not a valid URI or is not normalized as a conformance error. CID and DID 1.1 require only a valid URL per the URL Standard and do not require normalization.
+- Every string value of `serviceEndpoint` MUST be a valid URI conforming to RFC 3986 and normalized per RFC 3986 §6 (Normalization and Comparison) and the normalization rules of its scheme specification. `document.Validate(d, spec.V10)` reports a string that is not a valid URI or is not normalized as an error finding (`SeverityError`). CID and DID 1.1 require only a valid URL per the URL Standard and do not require normalization.
 
 ---
 
@@ -177,14 +181,14 @@ Each service map **MUST contain** `type` and `serviceEndpoint`. `id` is OPTIONAL
 
 ## 11. Go mapping summary (generic CID layer; relationship to `05-go-design.md` §3.3)
 
-> This mapping is a reference shape from the viewpoint of **generic CID documents** (which allow non-DID controllers). **The canonical form for the DID document implementation is the type-enforced form in `05` §3.3** (`ID did.DIDURL` / `Controller did.DID`). The string form below is the mapping to use when the CID layer is reused independently of DIDs.
+> Generic CID documents also allow controllers that are not DIDs, but did-go's `vm.Method` has only the type-enforced form of **`05` §3.3** (`ID did.DIDURL` / `Controller did.DID`). The mapping below copies the shape of that code, and there is no separate string URL form.
 
 ```go
-// vm.Method (CID §2.2): id and controller are string URLs (a referenced VM may live in another document, so did.DID is not enforced here; the DID Core layer adds that constraint)
+// vm.Method (CID §2.2): id is a did.DIDURL (a relative DID URL is allowed in DID 1.1), controller is a did.DID
 type Method struct {
-    ID         string     // URL (constrained to a DID URL by DID Core)
+    ID         did.DIDURL // DID URL or relative DID URL
     Type       string     // exactly one VM type. Multikey and JsonWebKey: full validation; other types: generic form checks only
-    Controller string     // URL (constrained to a DID by DID Core). Only a claim; binding comes from the Retrieve algorithm
+    Controller did.DID    // only a claim; document.SelectMethod (the Retrieve algorithm) checks the binding
     Expires    *time.Time // XSD dateTimeStamp
     Revoked    *time.Time
     // Public key material: each OPTIONAL, never both (§2.1). Without it the VM cannot verify proofs
@@ -200,10 +204,16 @@ type Method struct {
 // vm.MultikeyCodec: multicodec prefix table (§5). Pure data that uses only the standard library, kept in vm.
 // crypto imports vm to use this table. vm does not import crypto (05 §1, §7).
 type MultikeyCodec struct {
-    Prefix    []byte // e.g. {0xed,0x01} Ed25519
-    RawLen    int    // 32
-    Algorithm string // "Ed25519"
+    Name              string  // key type, for example "Ed25519"
+    Prefix            [2]byte // two-byte varint multicodec prefix, for example {0xed, 0x01}
+    KeyLength         int     // number of key bytes after the prefix, for example 32
+    Secret            bool    // true for a secret key row
+    PrefixStatement   string  // requirement id of the prefix and length rule
+    EncodingStatement string  // requirement id of the base-58-btc encoding rule; "" for a row stated without MUST
 }
+func MultikeyCodecs() []MultikeyCodec                                  // public and secret key rows, in a fresh slice
+func DecodeMultikey(value string, secret bool) (MultikeyCodec, []byte, error) // checks header z, a prefix of the expected kind and the row's length
+func EncodeMultikey(codec MultikeyCodec, key []byte) (string, error)
 ```
 
 **Hard validator rules (to be turned into tests):**
@@ -211,7 +221,7 @@ type MultikeyCodec struct {
 2. `publicKeyJwk` must not contain private members such as `d`. If `secretKeyJwk` is present, it must be an RFC7517 JWK map. `publicKeyMultibase` must be a Multibase string for every VM type (§5).
 3. `id` (URL), `type` and `controller` (URL) are required. `type` is a string that references exactly one VM type and is not limited to two types. `Multikey` and `JsonWebKey` get full validation. Other types get only the generic form checks (§5) and are not used to verify proofs unless a codec is registered (§2).
 4. Multikey: `z` + base58btc, with the correct multicodec prefix and length. A secret key header where a public key is expected is an error.
-5. Service: `type` and `serviceEndpoint` (strings must be valid URLs) are required. Duplicate `id` values are prohibited. Under ProfileV10, `id` is required (RFC 3986 URI) and endpoint strings are normalized RFC 3986 URIs (§8). Additional properties are kept in `Extra`.
+5. Service: `type` and `serviceEndpoint` (strings must be valid URLs) are required. Duplicate `id` values are prohibited. In V10 validation, `id` is required (RFC 3986 URI) and endpoint strings are normalized RFC 3986 URIs (§8). Additional properties are kept in `Extra`.
 6. Relationship values: a set of one or more VMs, embedded or referenced.
 7. Retrieve VM (§3): implement the two-way binding and the 5 errors.
 8. Fragment Resolution (§4): match id == fragment or id == base + fragment.
