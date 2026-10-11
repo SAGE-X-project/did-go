@@ -35,7 +35,9 @@ func references(t *testing.T) map[string][]string {
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if name == ".git" || name == "tools" || name == "docs" {
+			// Hidden directories (.git, editor and agent worktrees) are not
+			// part of the module, as in internal/archtest.
+			if path != moduleRoot && (strings.HasPrefix(name, ".") || name == "tools" || name == "docs") {
 				return filepath.SkipDir
 			}
 			return nil

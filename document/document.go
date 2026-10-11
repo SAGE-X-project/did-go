@@ -12,6 +12,7 @@ import (
 type Document struct {
 	id            did.DID
 	controllers   []did.DID
+	ctrlShape     vm.Shape
 	alsoKnownAs   []string
 	methods       []vm.Method
 	relationships [6][]vm.Relationship
@@ -26,6 +27,12 @@ func (d *Document) ID() did.DID { return d.id }
 // Controllers returns the DID controllers, in a fresh slice; nil when the
 // controller property is absent.
 func (d *Document) Controllers() []did.DID { return slices.Clone(d.controllers) }
+
+// ControllerShape returns whether the controller property is a single
+// string (vm.ShapeSingle) or a set (vm.ShapeSet). It is vm.ShapeDefault only
+// when the property is absent. A set may be empty: a consumer that read
+// "controller": [] keeps that form.
+func (d *Document) ControllerShape() vm.Shape { return d.ctrlShape }
 
 // AlsoKnownAs returns the alsoKnownAs URIs, in a fresh slice.
 func (d *Document) AlsoKnownAs() []string { return slices.Clone(d.alsoKnownAs) }

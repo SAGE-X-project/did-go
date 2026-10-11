@@ -160,7 +160,7 @@ Each service map **MUST contain** `type` and `serviceEndpoint`. `id` is OPTIONAL
 
 ## 9. Multibase and Multihash data types (§2.4)
 
-- **Multibase** (§`#multibase-0`): `z` means base58-btc, `u` means base64-url-no-pad. On encoding, the header character MUST be prepended. On decoding, everything after the first character is Base Decoded with the corresponding alphabet.
+- **Multibase** (§`#multibase-0`): `z` means base58-btc, `u` means base64-url-no-pad. On encoding, the header character MUST be prepended. On decoding, everything after the first character is Base Decoded with the corresponding alphabet. Both headers use the CID §3.1/§3.2 integer base-conversion algorithm, which for `u` differs from RFC 4648 bit packing (tension T8 in `08`).
   - Encoding and decoding MUST apply CID §3.1 Base Encode and §3.2 Base Decode (§2.4). Another algorithm with the same output MAY be used (§2.4 and the §3 introduction). Both algorithms use integer arithmetic only, and each leading zero byte maps to one leading first-alphabet character and back on decoding. did-go may use a vetted base58btc or base64url library, and tests compare its output with the CID examples. The other §3 algorithms (Retrieve VM, Fragment Resolution) may also be implemented differently as long as the output is the same.
 - **Multihash** (§`#multihash`): varint(header) ‖ varint(length) ‖ digest. For example `sha2-256` = `0x12` (32 bytes).
   - To decode, remove the varint header (hash algorithm) and the varint digest length, then extract the digest (MUST, §2.5). The digest length MUST equal both the output length of the algorithm the header names and the length written in the value. Otherwise the value is rejected.

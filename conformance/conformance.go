@@ -41,13 +41,16 @@ type registry struct {
 	Requirements []Requirement `json:"requirements"`
 }
 
-var load = sync.OnceValues(func() ([]Requirement, error) {
+var load = sync.OnceValues(func() ([]Requirement, error) { return decode(registryJSON) })
+
+// decode parses a registry file.
+func decode(data []byte) ([]Requirement, error) {
 	var r registry
-	if err := json.Unmarshal(registryJSON, &r); err != nil {
+	if err := json.Unmarshal(data, &r); err != nil {
 		return nil, fmt.Errorf("conformance: decode registry: %w", err)
 	}
 	return r.Requirements, nil
-})
+}
 
 // Requirements returns a fresh copy of the registry.
 func Requirements() ([]Requirement, error) {

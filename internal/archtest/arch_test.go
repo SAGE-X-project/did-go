@@ -52,6 +52,7 @@ var layers = map[string]layer{
 	"conformance":           layerMeta,
 	"internal/archtest":     layerMeta,
 	"internal/testutil":     layerMeta,
+	"internal/roundtrip":    layerMeta,
 }
 
 // allowed reports whether a package of layer from may import a package of
