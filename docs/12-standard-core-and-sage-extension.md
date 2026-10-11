@@ -348,9 +348,26 @@ The resolve path works in this order.
    adapter recognizes this error and maps it to `representationNotSupported`
    (`09` §6.1).
 
-The SAGE profile (`advanced/sage`) is stricter. It requires an exact match on a
-single media type, accepts no q-values, and does not fall back to transcoding
-(the same as DIDP-02 of the sage-spec proposal).
+The SAGE profile (`advanced/sage`) is stricter on the SAGE interface only.
+There it requires an exact match on a single media type, accepts no q-values,
+and does not fall back to transcoding (DIDP-02 of the sage-spec proposal). When
+`did:sage` is resolved through the DID Resolution interface, steps 1 to 4 above
+apply unchanged. The project owner gave this answer to DG-4 of the proposal on
+2026-10-12.
+
+A document returned through the DID Resolution interface is still a DIDP-01
+projection of the proposal: the DID 1.1 projection for `application/did` and
+the DID Core 1.0 projection for any other DID media type. The two projections
+differ in the verification method `type`, so one cannot be made by transcoding
+the other (DG-5). The `did:sage` driver therefore lists both media types in
+`Produces` and builds the projection for the `MediaType` the resolver picked
+directly from the record.
+
+`advanced/sage` produces the SAGE error codes and the `sageCode` member itself,
+in front of the standard resolver. The standard resolver replaces a driver
+error with a fixed code, so a driver behind it cannot emit
+`METHOD_NOT_SUPPORTED`, `INVALID_OPTIONS` or `sageCode` (DG-2, DG-3). The
+standard core's `resolution.Error` gains no problem extension members.
 
 The extension may only make validation stricter. Neither a driver nor a profile
 can disable the core validation on the resolve path. So no driver, including
@@ -445,7 +462,7 @@ candidate approach and has not been designed.
 | 20 | Resolve results keep the bytes returned (`Raw`), the detection result (`Info`) and, after transcoding, the original (`Source`); drivers state `ContentType` and the forms they can produce (`Produces`) | Signature verification without trusting re-serialization; `accept` handling (§6.2) |
 | 21 | Staking is not a basis for trust or for admission | Entry barrier, and attacks whose gain exceeds the stake (§7) |
 | 22 | The core consumes every driver output and runs standard validation; drivers and profiles cannot disable it | The extension can only be stricter (§2 rule 3). The result `contentType` is the media type of the bytes returned in `Result.Raw`: the DID media type the driver declared when the driver bytes are returned, or, for a low-precision label, the precise DID media type of the detected representation; if the core transcoded, the media type of the produced representation. The caller MUST parse with it (DID Resolution §4.2) (§6.2) |
-| 23 | The standard core matches `accept` with RFC 9110 rules and transcodes when needed; the SAGE profile matches exactly one type and does not transcode | The SHOULD in DID Resolution §4.1 ("if such a representation is supported and available"); DIDP-02 of the sage-spec proposal (§6.2) |
+| 23 | The standard core matches `accept` with RFC 9110 rules and transcodes when needed; the SAGE profile matches exactly one type and does not transcode on the SAGE interface only; resolving `did:sage` through the DID Resolution interface follows the standard core rules | The SHOULD in DID Resolution §4.1 ("if such a representation is supported and available"); DIDP-02 of the sage-spec proposal and the answer to DG-4 (§6.2) |
 
 ## 9. Open decisions
 
@@ -454,5 +471,7 @@ sage-spec and rs-sage-core, so that any project can import `did-go`.
 
 - Whether `did:webvh` ships with `did:web` or waits for wider adoption.
 - Whether a general extension that reads DIDs from A2A cards is needed.
-- OPEN-1 to OPEN-5 of the sage-spec proposal. `advanced/sage` is not
-  implemented before the proposal is adopted.
+- Adoption of the sage-spec proposal. The project owner answered OPEN-1 to
+  OPEN-5 and DG-1 to DG-5 on 2026-10-12 by accepting the recommendations, but
+  the answers are not adoption. `advanced/sage` is not implemented before the
+  proposal is adopted.
