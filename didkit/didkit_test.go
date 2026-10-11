@@ -112,26 +112,26 @@ func TestNewDereferencer(t *testing.T) {
 
 func TestProducerOptions(t *testing.T) {
 	jsonld := resolution.ResolutionOptions{Accept: spec.MediaTypeDIDLDJSON}
-	t.Run("core10#production-0.5 the default producer refuses a term the @context does not define", func(t *testing.T) {
+	t.Run("did11-cr20260305#production-and-consumption.10 the default producer writes every entry", func(t *testing.T) {
 		// The consumer keeps the undefined term so that the producer sees it.
 		kit := didkit.New(didkit.WithConsumerOptions(consumer.KeepUndefinedTerms()))
 		r, err := kit.NewResolver(exampleDriver())
 		if err != nil {
 			t.Fatal(err)
 		}
-		wantCode(t, resolve(t, r, "did:example:123", jsonld), resolution.CodeFeatureNotSupported)
+		wantCode(t, resolve(t, r, "did:example:123", jsonld), "")
 		if first, second := kit.Producer(), kit.Producer(); first == nil || first != second {
 			t.Fatal("the Kit has one producer")
 		}
 	})
-	t.Run("producer options reach the resolver's producer", func(t *testing.T) {
+	t.Run("core10#production-0.5 producer options reach the resolver's producer", func(t *testing.T) {
 		kit := didkit.New(didkit.WithConsumerOptions(consumer.KeepUndefinedTerms()),
-			didkit.WithProducerOptions(producer.AllowUndefinedTerms()))
+			didkit.WithProducerOptions(producer.RejectUndefinedTerms()))
 		r, err := kit.NewResolver(exampleDriver())
 		if err != nil {
 			t.Fatal(err)
 		}
-		wantCode(t, resolve(t, r, "did:example:123", jsonld), "")
+		wantCode(t, resolve(t, r, "did:example:123", jsonld), resolution.CodeFeatureNotSupported)
 	})
 }
 
