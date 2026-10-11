@@ -11,6 +11,8 @@
 
 ## 1. Package layout
 
+> The implementation package layout (players, shared types, layers) is defined by [`14`](14-implementation-architecture.md), which supersedes this section where they differ.
+
 ```
 did-go/
 ├── spec/                # SpecVersion (V10/V11/VUnknown), small, dependency-free  FR-V1

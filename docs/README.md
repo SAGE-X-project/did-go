@@ -59,6 +59,7 @@ and DID Resolution, is extracted into [06](06-cid-data-model.md) and
 | [10-abnf-appendix.md](10-abnf-appendix.md) | Full ABNF (the parser's reference), conformance test vectors, context file digests |
 | [12-standard-core-and-sage-extension.md](12-standard-core-and-sage-extension.md) | Standard-first principle and the advanced SAGE extension, module layout, trust boundary, agent information management, role layers, decisions 16 to 23 |
 | [13-xbar-verification.md](13-xbar-verification.md) | X-bar verification of both language versions against the pinned specifications: method, results by round, changes, recorded deviations and remaining risk |
+| [14-implementation-architecture.md](14-implementation-architecture.md) | Implementation architecture: layers, shared types and contracts, separated players, wiring, spec-driven development, per-version inspection, pinned method specifications, order of implementation |
 | [standards.md](standards.md) | Dated W3C publications the design follows, with SHA-256 |
 
 Number 11 is not published here: it is a jurisdiction-specific legal review
@@ -71,7 +72,7 @@ Go), 06 and 07 (the delegated specifications in detail), 09 (v1.0
 compatibility), 10 (starting implementation: ABNF, test vectors, assets), 12
 (the standard core, the SAGE extension and the repository layout). 08 holds the
 verification history, and 13 the X-bar verification against the
-specifications.
+specifications. 14 is the implementation architecture.
 
 ## Provenance
 
