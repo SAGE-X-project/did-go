@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 // reader turns JSON nodes into the data model by the consumption rules of
 // DID Core 1.0 §6.2.2 and DID 1.1 §6.2.2.
 type reader struct {
+	version spec.Version
 	terms   jsonld.Terms
 	drop    bool
 	dropped []string
@@ -177,7 +179,7 @@ func (r *reader) relationship(b *document.Builder, p vm.Purpose, n wire.Node) er
 		where := fmt.Sprintf("%s[%d]", p, i)
 		switch item.Kind {
 		case wire.String:
-			ref, err := did.ParseReference(item.Text)
+			ref, err := methodRef(item.Text)
 			if err != nil {
 				return errorf(where, "cid10#authentication.3", "not a DID URL: %v", err)
 			}
@@ -245,7 +247,7 @@ func (r *reader) methodMember(m *vm.Method, mem wire.Member, where string) error
 	switch mem.Name {
 	case wire.PropID:
 		err = stringInto(mem.Value, where, "cid10#verification-methods.3", func(s string) (e error) {
-			m.ID, e = did.ParseReference(s)
+			m.ID, e = methodRef(s)
 			return e
 		})
 	case wire.PropType:
@@ -261,8 +263,14 @@ func (r *reader) methodMember(m *vm.Method, mem wire.Member, where string) error
 		m.Revoked, err = readTime(mem.Value, where, "cid10#verification-methods.11")
 	case wire.PropPublicKeyMultibase:
 		err = stringInto(mem.Value, where, "core10#verification-material.7", func(s string) error { m.PublicKeyMultibase = s; return nil })
+		if err == nil && mem.Value.Text == "" {
+			err = emptyMultibase(where, r.publicMultibaseStatement())
+		}
 	case wire.PropSecretKeyMultibase:
 		err = stringInto(mem.Value, where, "cid10#Multikey.5", func(s string) error { m.SecretKeyMultibase = s; return nil })
+		if err == nil && mem.Value.Text == "" {
+			err = emptyMultibase(where, "cid10#Multikey.5")
+		}
 	case wire.PropPublicKeyJwk:
 		m.PublicKeyJwk, err = jwk(mem.Value, where, "cid10#JsonWebKey.3")
 	case wire.PropSecretKeyJwk:
@@ -271,6 +279,44 @@ func (r *reader) methodMember(m *vm.Method, mem wire.Member, where string) error
 		m.Extra = withExtra(m.Extra, mem)
 	}
 	return err
+}
+
+// methodRef parses a reference to a verification method. The empty
+// reference "" is a relative DID URL that resolves to the DID itself (RFC
+// 3986 §5.4.1), which identifies the DID subject and not a verification
+// method, so it is refused as before.
+func methodRef(s string) (did.DIDURL, error) {
+	if s == "" {
+		return did.DIDURL{}, errors.New("the empty reference resolves to the DID itself, not to a verification method")
+	}
+	return did.ParseReference(s)
+}
+
+// emptyMultibase rejects a present but empty publicKeyMultibase or
+// secretKeyMultibase. vm.Method stores "" as an absent property, so the
+// check is made here, where the JSON still shows the member: "If present,
+// its value MUST be a Multibase encoded value" (CID 1.0 §2.2.2), and a
+// Multibase value has at least its one-character header (CID 1.0 §2.4).
+func emptyMultibase(where, statement string) error {
+	return errorf(where, statement, "an empty string is not a Multibase encoded value")
+}
+
+// serviceIDStatement is the statement on the service id value for the
+// detected version: DID Core 1.0 §5.4 (a URI) or CID 1.0 §2.1.4 (a URL).
+func (r *reader) serviceIDStatement() string {
+	if r.version == spec.V10 {
+		return "core10#services.5"
+	}
+	return "cid10#services.6"
+}
+
+// publicMultibaseStatement is the statement on the publicKeyMultibase value
+// for the detected version: DID Core 1.0 §5.2.1 or CID 1.0 §2.2.2.
+func (r *reader) publicMultibaseStatement() string {
+	if r.version == spec.V10 {
+		return "core10#verification-material.7"
+	}
+	return "cid10#Multikey.3"
 }
 
 // stringInto checks that n is a string and passes it to set; an error from
@@ -312,6 +358,12 @@ func (r *reader) service(n wire.Node, where string) (vm.Service, error) {
 		switch mem.Name {
 		case wire.PropID:
 			err = stringInto(mem.Value, at, "cid10#services.6", func(v string) error { s.ID = v; return nil })
+			if err == nil && mem.Value.Text == "" {
+				// vm.Service stores "" as an absent id, so a present but empty
+				// id is refused here: "If present, its value MUST be a URL"
+				// (CID 1.0 §2.1.4); DID Core 1.0 §5.4 requires a URI.
+				err = errorf(at, r.serviceIDStatement(), "an empty string is not a URL")
+			}
 		case wire.PropType:
 			s.Type, s.TypeShape, err = serviceTypes(mem.Value, at)
 		case wire.PropServiceEndpoint:

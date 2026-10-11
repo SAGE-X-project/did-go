@@ -122,7 +122,7 @@ func (c *Consumer) Consume(data []byte, mediaType string, opts representation.Co
 	if err != nil {
 		return nil, none, err
 	}
-	r := reader{}
+	r := reader{version: info.DetectedVersion}
 	if info.IsJSONLD {
 		if err := r.context(root, info.DetectedVersion, c.keepUndefined); err != nil {
 			return nil, none, err

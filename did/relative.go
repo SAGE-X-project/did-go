@@ -11,16 +11,17 @@ import (
 // method-name ":" method-specific-id, and path, query and fragment are those
 // of the DID URL. A reference can therefore change the path, query and
 // fragment but never the DID, unless it is an absolute DID URL.
+//
+// The zero DIDURL is the empty reference "". RFC 3986 §5.2.2 gives it the
+// path and query of the base and its own, undefined, fragment, so it
+// resolves to the base without its fragment (RFC 3986 §5.4.1 "" = base).
 func (u DIDURL) Resolve(base DIDURL) (DIDURL, error) {
 	if base.IsRelative() || base.IsZero() {
 		return DIDURL{}, fmt.Errorf("did: the base of a reference must be an absolute DID URL")
 	}
-	if u.IsZero() {
-		return DIDURL{}, fmt.Errorf("did: empty reference")
-	}
 	t := DIDURL{did: base.did, query: u.query, hasQuery: u.hasQuery, fragment: u.fragment, hasFragment: u.hasFragment}
 	switch {
-	case !u.IsRelative():
+	case !u.did.IsZero():
 		t.did = u.did
 		t.path = removeDotSegments(u.path)
 	case u.path == "":
@@ -42,7 +43,7 @@ func (u DIDURL) Resolve(base DIDURL) (DIDURL, error) {
 
 // ParseRef parses a relative or absolute DID URL reference and resolves it
 // against base, for example "#key-1" against did:example:123 gives
-// did:example:123#key-1.
+// did:example:123#key-1, and the empty reference "" gives did:example:123.
 func ParseRef(ref string, base DID) (DIDURL, error) {
 	u, err := ParseReference(ref)
 	if err != nil {
