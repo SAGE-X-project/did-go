@@ -2,11 +2,19 @@ package conformance
 
 import (
 	"io/fs"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 )
+
+// otherModule reports whether dir holds a go.mod of its own, such as the
+// advanced/sage extension: its packages and tests belong to that module.
+func otherModule(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, "go.mod"))
+	return err == nil
+}
 
 // packageDirs returns the module directories that hold Go files, skipping
 // the same directories as references.
@@ -19,7 +27,7 @@ func packageDirs(t *testing.T) []string {
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if path != moduleRoot && (strings.HasPrefix(name, ".") || name == "tools" || name == "docs" || name == "testdata") {
+			if path != moduleRoot && (strings.HasPrefix(name, ".") || name == "tools" || name == "docs" || name == "testdata" || otherModule(path)) {
 				return filepath.SkipDir
 			}
 			return nil
