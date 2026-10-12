@@ -470,3 +470,18 @@ func TestProducerFailure(t *testing.T) {
 // the subtest name. Each id is its own string literal, which is how the
 // coverage check (conformance/coverage_test.go) finds it.
 func covers(parts ...string) string { return strings.Join(parts, " ") }
+
+// expandRelativeUrls returns a new document; an empty verificationMethod or
+// service set stays present in it (core10#verification-methods.2,
+// core10#services.2: the values are sets, which may be empty).
+func TestExpandKeepsEmptySets(t *testing.T) {
+	doc := `{"id":"did:example:123","verificationMethod":[],"service":[]}`
+	r := newResolver(t, fixture(testutil.Static(doc, spec.MediaTypeDID, document.Metadata{})))
+	res := r.Resolve(t.Context(), testutil.MustDID(testutil.ExampleDID), resolution.ResolutionOptions{ExpandRelativeURLs: true})
+	if res.ResolutionMetadata.Error != nil {
+		t.Fatal(res.ResolutionMetadata.Error)
+	}
+	if !strings.Contains(string(res.Raw), `"verificationMethod":[],"service":[]`) {
+		t.Errorf("expanded document %s lost an empty set", res.Raw)
+	}
+}

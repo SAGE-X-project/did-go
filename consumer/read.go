@@ -158,6 +158,7 @@ func (r *reader) methods(b *document.Builder, n wire.Node) error {
 	if err := want(n, wire.Array, wire.PropVerificationMethod, "cid10#verification-methods.1"); err != nil {
 		return err
 	}
+	b.VerificationMethod() // present even when the set is empty
 	for i, item := range n.Items {
 		m, err := r.method(item, fmt.Sprintf("verificationMethod[%d]", i))
 		if err != nil {
@@ -202,6 +203,7 @@ func (r *reader) services(b *document.Builder, n wire.Node) error {
 	if err := want(n, wire.Array, wire.PropService, "cid10#services.2"); err != nil {
 		return err
 	}
+	b.Service() // present even when the set is empty
 	for i, item := range n.Items {
 		s, err := r.service(item, fmt.Sprintf("service[%d]", i))
 		if err != nil {
