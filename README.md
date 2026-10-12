@@ -4,7 +4,7 @@ A Go library for W3C Decentralized Identifiers. It implements DID Core 1.0 and
 DID 1.1 over one superset core, the parts of Controlled Identifiers 1.0 that
 DID 1.1 delegates to, and the DID Resolution v1.0 resolver, dereferencer and
 HTTPS binding. Standard DID support is complete on its own; SAGE support is an
-opt-in advanced extension that is not implemented yet. The design is in
+opt-in advanced extension in its own module, `advanced/sage`. The design is in
 [`docs/`](docs/README.md).
 
 ## Packages
@@ -27,6 +27,14 @@ Players, one package per role. A player never imports another player:
 
 `didkit` wires the standard players together; it never imports a driver, so a
 did:key user does not pull in `net/http`.
+
+`advanced/sage` (module `github.com/sage-x-project/did-go/advanced/sage`)
+presents did:sage records as DID documents under the adopted rules of SAGE
+0.10.0 chapter 10: the DID Core 1.0 and DID 1.1 projections, the exact accept
+table of the SAGE interface, a did:sage driver, and a resolver and HTTP(S)
+handler in front of the standard ones that add the DIDP-05 error mapping and
+the `sageCode` problem member. Records come from a `Source` the deployment
+configures; the module decides no trust and holds no key.
 
 ## Example
 
@@ -62,7 +70,7 @@ deviations are recorded as tensions in
 ## Not implemented yet
 
 - Issuer, holder and verifier roles for verifiable credentials.
-- The `advanced/sage` extension, which waits for the adoption of the A2A and
-  DID interoperability proposal in sage-spec.
+- A `Source` backed by the SAGE cores: the Go core does not yet return the
+  services, controller and observation metadata a projection needs.
 
 Licensed under the Apache License, Version 2.0 (see `LICENSE`).

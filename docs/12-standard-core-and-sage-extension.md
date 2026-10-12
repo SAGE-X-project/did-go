@@ -66,9 +66,12 @@ github.com/sage-x-project/did-go            (root module, standard core)
 ├── crypto/
 └── advanced/
     └── sage/                                (own go.mod, advanced extension)
-        ├── driver.go      did:sage method driver (wraps a SAGE core)
-        ├── projection.go  produces the DID 1.0 and 1.1 projections SAGE defines
-        ├── profile.go     SAGE consumption profile (stricter validation)
+        ├── record.go      the Source interface, the record model and its checks
+        ├── projection.go  DID 1.0 and 1.1 projections and metadata (DIDP-01, RESOLVE-03)
+        ├── accept.go      the SAGE interface accept table and response (DIDP-02)
+        ├── driver.go      did:sage method driver
+        ├── resolver.go    front of the standard resolver (DIDP-05)
+        ├── handler.go     front of the DID Resolution HTTP(S) binding, adds sageCode
         └── errors.go      maps SAGE error codes to DID Resolution errors
 ```
 
@@ -79,6 +82,10 @@ github.com/sage-x-project/did-go            (root module, standard core)
 - Extension module tags have the form `advanced/sage/vX.Y.Z`. During
   development the modules are combined with `go.work`; release builds do not
   use `replace`.
+- The `profile.go` of the first design (a stricter consumption profile) was not
+  built. Under chapter 10 DIDP-04 a received DID document is not key
+  authority, so there was nothing to check more strictly on the consuming side.
+  The exact accept table of the SAGE interface lives in `accept.go` instead.
 - A driver that uses the network, such as `did:web`, takes an injected HTTP
   client even though it lives in the root module. The root module itself never
   touches the network.
@@ -92,8 +99,8 @@ look at. Showing a copy does not prove who you are. Identity is confirmed
 against the registry's original record. In SAGE the registered record is that
 original.
 
-The following rules hold. They match DIDP-04 of the sage-spec proposal
-`proposals/a2a-did-interop`, which is not yet adopted.
+The following rules hold. They match DIDP-04 of SAGE 0.10.0 chapter 10,
+adopted on 2026-10-12.
 
 - For an operation SAGE protects, the SAGE core decides signing and
   key-agreement authority directly from the authoritative record. A DID
@@ -102,15 +109,17 @@ The following rules hold. They match DIDP-04 of the sage-spec proposal
 - A result from the `did-go` general resolver is for display and for external
   consumers. The SAGE core imports only the syntax and data model packages of
   `did-go`; it performs resolution and key decisions itself.
-- The `advanced/sage` driver goes the other way: it wraps a SAGE core and gives
-  external DID consumers `did:sage` resolution results. Dependencies point one
-  way only: the SAGE core points at the root module, and the extension module
-  points at the SAGE core and the root module.
+- `advanced/sage` goes the other way: it takes records from a SAGE core and
+  gives external DID consumers `did:sage` resolution results. Records arrive
+  through the `Source` interface the deployment configures, and a SAGE core
+  implements it. Dependencies point one way only: the SAGE core points at the
+  root module, and the extension module points at the root module. The
+  extension module does not import a SAGE core.
 
 ```mermaid
 flowchart LR
     SC[SAGE core] -->|uses syntax and data model only| ROOT[did-go standard core]
-    ADV[did-go advanced/sage] -->|wraps| SC
+    SC -->|implements Source| ADV[did-go advanced/sage]
     ADV -->|implements a method driver| ROOT
     EXT[external DID consumer] -->|resolves did:sage| ROOT
 ```
@@ -142,10 +151,10 @@ The three forms are kept consistent as follows.
 1. Both DID projections are produced from one observation of the record. The
    document `id`, verification methods, relationships, services and
    `versionId` must agree; only `@context`, media type and verification method
-   `type` differ (proposal DIDP-03).
+   `type` differ (chapter 10 DIDP-03).
 2. A card carries the record version and is rejected, even with a valid
-   signature, when it differs from the current record version (proposal
-   A2AB-05). A changed record requires a newly signed card.
+   signature, when it differs from the current record version (A2A 1.0
+   binding profile A2AB-05). A changed record requires a newly signed card.
 3. `did-go` is responsible for producing the projections exactly as the
    standards require and for consuming received documents by the standards.
    Card verification and protected-operation decisions stay in the SAGE cores
@@ -153,9 +162,9 @@ The three forms are kept consistent as follows.
    now, because A2A does not define DIDs; it will be considered as a separate
    extension if a need is shown.
 
-This system does not take over SAGE's normative decisions (OPEN-1 to OPEN-5 of
-the proposal). Until the proposal is adopted, `advanced/sage` is designed but
-not implemented.
+This system does not take over SAGE's normative decisions. They were adopted as
+SAGE 0.10.0 normative design on 2026-10-12 (sage-spec `06b50e1`), and
+`advanced/sage` implements the adopted rules.
 
 ## 6. Additions to the earlier design
 
@@ -341,7 +350,7 @@ The resolve path works in this order.
    representation-specific error and uses this error for an unsupported option;
    `REPRESENTATION_NOT_SUPPORTED` is defined only for the dereferencing
    `accept` option. This choice is an interpretation, and it matches the
-   mapping in DIDP-05 of the sage-spec proposal. In Go it is returned as the
+   mapping in DIDP-05 of SAGE 0.10.0 chapter 10. In Go it is returned as the
    error made by `resolution.NewAcceptNotSupported`. Its type is
    `FEATURE_NOT_SUPPORTED`, and `IsAcceptNotSupported` recognizes it.
    DID Core 1.0 defines `representationNotSupported` for this case, so the v1.0
@@ -350,13 +359,13 @@ The resolve path works in this order.
 
 The SAGE profile (`advanced/sage`) is stricter on the SAGE interface only.
 There it requires an exact match on a single media type, accepts no q-values,
-and does not fall back to transcoding (DIDP-02 of the sage-spec proposal). When
-`did:sage` is resolved through the DID Resolution interface, steps 1 to 4 above
-apply unchanged. The project owner gave this answer to DG-4 of the proposal on
-2026-10-12.
+and does not fall back to transcoding (chapter 10 DIDP-02). When `did:sage` is
+resolved through the DID Resolution interface, steps 1 to 4 above apply
+unchanged. The project owner gave this answer to DG-4 of the proposal before
+adoption, and the adopted DIDP-02 says the same.
 
 A document returned through the DID Resolution interface is still a DIDP-01
-projection of the proposal: the DID 1.1 projection for `application/did` and
+projection of chapter 10: the DID 1.1 projection for `application/did` and
 the DID Core 1.0 projection for any other DID media type. The two projections
 differ in the verification method `type`, so one cannot be made by transcoding
 the other (DG-5). The `did:sage` driver therefore lists both media types in
@@ -368,6 +377,16 @@ in front of the standard resolver. The standard resolver replaces a driver
 error with a fixed code, so a driver behind it cannot emit
 `METHOD_NOT_SUPPORTED`, `INVALID_OPTIONS` or `sageCode` (DG-2, DG-3). The
 standard core's `resolution.Error` gains no problem extension members.
+
+In the implementation, `Resolver` wraps the standard resolver. When the driver
+fails to observe a record, it leaves the SAGE error in the request context, and
+`Resolver` replaces the error the standard resolver reported with the DIDP-05
+mapping. On the HTTP(S) binding, `Handler` takes the response of the standard
+`universal.Handler` and adds `sageCode` only to a problem object whose type is
+the mapped DID Resolution type. A response the standard handler makes on its
+own, such as the refusal of a request without TLS, therefore stays unchanged.
+An identifier whose prefix is not exactly the lowercase `did:sage:` is refused
+as `id.malformed` without observing a record (chapter 06 ID-01).
 
 The extension may only make validation stricter. Neither a driver nor a profile
 can disable the core validation on the resolve path. So no driver, including
@@ -447,7 +466,7 @@ This project does not use staking as a basis for trust, for two reasons.
 The trust of `did-go` and SAGE rests on registered keys and the signatures made
 with them, that is, on records that cannot be repudiated. Linking an ERC-8004
 registry entry to a `did:sage` identifier will be considered only as an optional
-feature, after the two-sided authenticated linkage that proposal DIDP-04 calls
+feature, after the two-sided authenticated linkage that chapter 10 DIDP-04 calls
 for is defined. Computing reputation from signed interaction records is one
 candidate approach and has not been designed.
 
@@ -457,12 +476,14 @@ candidate approach and has not been designed.
 |---|---|---|
 | 16 | The standard core comes first; SAGE features are an opt-in advanced extension | `did-go` must be useful without SAGE and usable by SAGE as is (§2) |
 | 17 | `advanced/sage` has its own `go.mod` | Keeps the SAGE core, its license and its release cadence out of the root module (§3) |
-| 18 | A DID document is not key authority for a protected operation | Authority comes only from the SAGE record; same as proposal DIDP-04 (§4) |
+| 18 | A DID document is not key authority for a protected operation | Authority comes only from the SAGE record; same as chapter 10 DIDP-04 (§4) |
 | 19 | A declared DID media type decides the representation; the payload is inspected only for low-precision media types | The production-and-consumption MUST of DID Core 1.0 and DID 1.1; DID 1.1 §6.3.1 (non-normative). The conflict with the DID Resolution example is recorded as T7 in 08 (§6.1) |
 | 20 | Resolve results keep the bytes returned (`Raw`), the detection result (`Info`) and, after transcoding, the original (`Source`); drivers state `ContentType` and the forms they can produce (`Produces`) | Signature verification without trusting re-serialization; `accept` handling (§6.2) |
 | 21 | Staking is not a basis for trust or for admission | Entry barrier, and attacks whose gain exceeds the stake (§7) |
 | 22 | The core consumes every driver output and runs standard validation; drivers and profiles cannot disable it | The extension can only be stricter (§2 rule 3). The result `contentType` is the media type of the bytes returned in `Result.Raw`: the DID media type the driver declared when the driver bytes are returned, or, for a low-precision label, the precise DID media type of the detected representation; if the core transcoded, the media type of the produced representation. The caller MUST parse with it (DID Resolution §4.2) (§6.2) |
-| 23 | The standard core matches `accept` with RFC 9110 rules and transcodes when needed; the SAGE profile matches exactly one type and does not transcode on the SAGE interface only; resolving `did:sage` through the DID Resolution interface follows the standard core rules | The SHOULD in DID Resolution §4.1 ("if such a representation is supported and available"); DIDP-02 of the sage-spec proposal and the answer to DG-4 (§6.2) |
+| 23 | The standard core matches `accept` with RFC 9110 rules and transcodes when needed; the SAGE profile matches exactly one type and does not transcode on the SAGE interface only; resolving `did:sage` through the DID Resolution interface follows the standard core rules | The SHOULD in DID Resolution §4.1 ("if such a representation is supported and available"); chapter 10 DIDP-02 (§6.2) |
+| 24 | `advanced/sage` takes records through the `Source` interface and does not import a SAGE core | The deployment decides which observation it trusts (RESOLVE-02). The Go core's `registry010.Snapshot` has no services, controller or observation metadata, so it cannot yet supply everything a projection needs (§3, §4) |
+| 25 | `sageCode` is added in front of the standard resolver and handler; the standard `resolution.Error` is unchanged | The standard core stays complete without SAGE (DIDP-05, §6.2) |
 
 ## 9. Open decisions
 
@@ -471,7 +492,6 @@ sage-spec and rs-sage-core, so that any project can import `did-go`.
 
 - Whether `did:webvh` ships with `did:web` or waits for wider adoption.
 - Whether a general extension that reads DIDs from A2A cards is needed.
-- Adoption of the sage-spec proposal. The project owner answered OPEN-1 to
-  OPEN-5 and DG-1 to DG-5 on 2026-10-12 by accepting the recommendations, but
-  the answers are not adoption. `advanced/sage` is not implemented before the
-  proposal is adopted.
+- Connecting the SAGE cores. When the Go core returns a validated record that
+  includes services, the controller and observation metadata, that core
+  implements `Source`. The Rust core follows the same contract.
