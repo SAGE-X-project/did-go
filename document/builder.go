@@ -80,8 +80,13 @@ func (b *Builder) AlsoKnownAs(u ...string) *Builder {
 	return b
 }
 
-// VerificationMethod adds verificationMethod entries.
+// VerificationMethod adds verificationMethod entries. Calling it with no
+// entry makes the property present and empty, which conforms: the value is
+// "a set of verification methods" (CID 1.0 §2.2), and a set may be empty.
 func (b *Builder) VerificationMethod(m ...vm.Method) *Builder {
+	if b.methods == nil {
+		b.methods = make([]vm.Method, 0, len(m))
+	}
 	for _, x := range m {
 		b.methods = append(b.methods, x.Clone())
 	}
@@ -101,8 +106,13 @@ func (b *Builder) Relationship(p vm.Purpose, r ...vm.Relationship) *Builder {
 	return b
 }
 
-// Service adds service entries.
+// Service adds service entries. Calling it with no entry makes the property
+// present and empty, which conforms: the value is "a set of services" (CID
+// 1.0 §2.1.4), and a set may be empty.
 func (b *Builder) Service(s ...vm.Service) *Builder {
+	if b.services == nil {
+		b.services = make([]vm.Service, 0, len(s))
+	}
 	for _, x := range s {
 		b.services = append(b.services, x.Clone())
 	}
@@ -155,6 +165,9 @@ func (b *Builder) document() (*Document, error) {
 	}
 	if len(b.controllers) > 0 || b.ctrlShape == vm.ShapeSet {
 		d.ctrlShape = b.ctrlShape.Resolve(len(b.controllers))
+	}
+	if b.services != nil {
+		d.services = make([]vm.Service, 0, len(b.services))
 	}
 	for _, s := range b.services {
 		c := s.Clone()

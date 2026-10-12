@@ -20,8 +20,11 @@ func expand(d *document.Document) (*document.Document, error) {
 	if d.ControllerShape() != vm.ShapeDefault {
 		b.ControllerShape(d.ControllerShape())
 	}
-	for _, m := range d.VerificationMethods() {
-		b.VerificationMethod(expandMethod(m, base))
+	if ms := d.VerificationMethods(); ms != nil {
+		b.VerificationMethod() // keep an empty set present
+		for _, m := range ms {
+			b.VerificationMethod(expandMethod(m, base))
+		}
 	}
 	for _, p := range vm.Purposes() {
 		rels := d.Relationship(p)
@@ -39,9 +42,12 @@ func expand(d *document.Document) (*document.Document, error) {
 		}
 		b.Relationship(p, out...)
 	}
-	for _, s := range d.Services() {
-		s.ID = absoluteString(s.ID, base)
-		b.Service(s)
+	if ss := d.Services(); ss != nil {
+		b.Service() // keep an empty set present
+		for _, s := range ss {
+			s.ID = absoluteString(s.ID, base)
+			b.Service(s)
+		}
 	}
 	for _, e := range d.Extensions().Entries() {
 		b.Extension(e.Key, expandValue(e.Value, base))
