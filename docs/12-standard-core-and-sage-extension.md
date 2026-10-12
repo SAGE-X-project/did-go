@@ -492,6 +492,7 @@ sage-spec and rs-sage-core, so that any project can import `did-go`.
 
 - Whether `did:webvh` ships with `did:web` or waits for wider adoption.
 - Whether a general extension that reads DIDs from A2A cards is needed.
-- Connecting the SAGE cores. When the Go core returns a validated record that
-  includes services, the controller and observation metadata, that core
-  implements `Source`. The Rust core follows the same contract.
+- Connecting eip155 registries. Web registries are connected: the Go core's
+  `didsource010.WebSource` implements `Source` (sage `fb9de2f`). eip155 is not,
+  because `registry010.Snapshot` carries no services, controller or
+  observation metadata.

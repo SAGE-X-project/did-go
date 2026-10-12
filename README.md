@@ -70,7 +70,8 @@ deviations are recorded as tensions in
 ## Not implemented yet
 
 - Issuer, holder and verifier roles for verifiable credentials.
-- A `Source` backed by the SAGE cores: the Go core does not yet return the
-  services, controller and observation metadata a projection needs.
+- A `Source` for eip155 registries. The SAGE Go core implements one for web
+  registries (`pkg/agent/didsource010`); its eip155 observation does not yet
+  carry the services, controller and observation metadata a projection needs.
 
 Licensed under the Apache License, Version 2.0 (see `LICENSE`).
