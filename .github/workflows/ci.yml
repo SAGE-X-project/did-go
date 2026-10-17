@@ -36,3 +36,26 @@ jobs:
           go test -race -coverprofile="$RUNNER_TEMP/sage-cover.out" ./...
           go tool cover -func="$RUNNER_TEMP/sage-cover.out" | awk '/^total:/ { sub(/%$/, "", $3); found=1; if ($3+0 < 90) exit 1 } END { if (!found) exit 1 }'
 
+      - name: Record key timestamp validation evidence
+        run: |
+          go test -count=1 -json -run '^TestKeyTimestampInputs$' ./consumer > "$RUNNER_TEMP/key-timestamp-tests.jsonl"
+          go tool cover -func="$RUNNER_TEMP/cover.out" > "$RUNNER_TEMP/coverage-functions.txt"
+          awk '$2 == "readTime" { value=$NF; sub(/%$/, "", value); found++; if (value+0 < 90) bad=1 } END { if (found != 1 || bad) exit 1 }' "$RUNNER_TEMP/coverage-functions.txt"
+          git rev-parse HEAD > "$RUNNER_TEMP/revision.txt"
+          git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/tree.txt"
+          go version > "$RUNNER_TEMP/compiler.txt"
+          sha256sum consumer/read.go consumer/datetime_test.go docs/key-timestamp-inputs.md .github/workflows/ci.yml > "$RUNNER_TEMP/source.sha256"
+      - name: Upload key timestamp validation evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: key-timestamp-validation
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/key-timestamp-tests.jsonl
+            ${{ runner.temp }}/cover.out
+            ${{ runner.temp }}/sage-cover.out
+            ${{ runner.temp }}/coverage-functions.txt
+            ${{ runner.temp }}/revision.txt
+            ${{ runner.temp }}/tree.txt
+            ${{ runner.temp }}/compiler.txt
+            ${{ runner.temp }}/source.sha256
