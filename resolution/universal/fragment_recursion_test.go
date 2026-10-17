@@ -55,7 +55,7 @@ func TestRecursiveFragmentTLS(t *testing.T) {
 			}
 			// The low-precision client returns bytes if a valid JSON number cannot fit
 			// its INFRA value model. Inspect the actual wire bytes without narrowing it.
-			resp, body := request(t, srv, "did:example:resources%23target", spec.MediaTypeDID)
+			resp, body := request(t, srv, "did%3Aexample%3Aresources%23target", spec.MediaTypeDID)
 			if resp.StatusCode != 200 {
 				t.Fatalf("TLS status %d: %s", resp.StatusCode, body)
 			}
