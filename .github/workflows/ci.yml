@@ -103,3 +103,24 @@ jobs:
             ${{ runner.temp }}/metadata-source.sha256
             ${{ runner.temp }}/cover.out
             ${{ runner.temp }}/sage-cover.out
+
+      - name: Record recursive fragment evidence
+        run: |
+          go test -count=1 -json -run '^Test(RecursiveFragmentMaps|FragmentNumbersAndFirstMatch|FragmentPublicBoundaryAndInvalidContainers|RecursiveFragmentTLS)$' ./dereferencer ./resolution/universal > "$RUNNER_TEMP/fragment-tests.jsonl"
+          go tool cover -func="$RUNNER_TEMP/cover.out" > "$RUNNER_TEMP/fragment-coverage.txt"
+          awk '$2 == "findFragment" || $2 == "findMethodFragment" || $2 == "findJSONFragment" { value=$NF; sub(/%$/, "", value); found++; if (value+0 < 90) bad=1 } END { if (found != 3 || bad) exit 1 }' "$RUNNER_TEMP/fragment-coverage.txt"
+          git rev-parse HEAD > "$RUNNER_TEMP/fragment-revision.txt"
+          git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/fragment-tree.txt"
+          go version > "$RUNNER_TEMP/fragment-compiler.txt"
+          sha256sum dereferencer/dereferencer.go dereferencer/fragment.go dereferencer/fragment_recursion_test.go resolution/universal/fragment_recursion_test.go docs/recursive-fragments.md .github/workflows/ci.yml > "$RUNNER_TEMP/fragment-source.sha256"
+      - name: Upload recursive fragment evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: recursive-fragments
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/fragment-*.jsonl
+            ${{ runner.temp }}/fragment-*.txt
+            ${{ runner.temp }}/fragment-source.sha256
+            ${{ runner.temp }}/cover.out
+            ${{ runner.temp }}/sage-cover.out
