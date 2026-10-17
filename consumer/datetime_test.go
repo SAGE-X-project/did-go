@@ -82,7 +82,7 @@ func timestampDocument(t *testing.T, field string, value any) []byte {
 	data, err := json.Marshal(map[string]any{
 		"id": "did:example:clock",
 		"verificationMethod": []any{map[string]any{
-			"id": "#key", "type": "Multikey", "controller": "did:example:clock", field: value,
+			"id": "did:example:clock#key", "type": "Multikey", "controller": "did:example:clock", field: value,
 		}},
 	})
 	if err != nil {
