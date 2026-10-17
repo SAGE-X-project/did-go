@@ -3,6 +3,7 @@ package consumer
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/sage-x-project/did-go/did"
@@ -214,12 +215,22 @@ func (r *reader) services(b *document.Builder, n wire.Node) error {
 	return nil
 }
 
-// readTime reads a datetime ("JSON String where data model entry value is a
-// datetime: A datetime"). Expires and revoked are XML Schema dateTimeStamp
-// values (CID 1.0 §2.2), which carry a time zone; RFC 3339 is that form.
+// keyTimestampForm checks the supported four-digit-year lexical form before
+// Go's RFC3339 parser, which also accepts comma fractions, single-digit hours
+// and out-of-range timezone minutes. XSD 1.1 Part 2 (2012-04-05), sections
+// 3.3.7.2 and 3.4.28, requires a decimal point and a timezone within +/-14:00.
+// Calendar validation remains the parser's responsibility. This is not a
+// complete XSD dateTimeStamp implementation; see docs/key-timestamp-inputs.md.
+var keyTimestampForm = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-](0[0-9]|1[0-3]):[0-5][0-9]|[+-]14:00)$`)
+
+// readTime reads the supported datetime form of expires and revoked
+// (CID 1.0, verification-methods.9 and verification-methods.11).
 func readTime(n wire.Node, where, statement string) (*time.Time, error) {
 	if err := want(n, wire.String, where, statement); err != nil {
 		return nil, err
+	}
+	if !keyTimestampForm.MatchString(n.Text) {
+		return nil, errorf(where, statement, "not a dateTimeStamp")
 	}
 	t, err := time.Parse(time.RFC3339, n.Text)
 	if err != nil {
