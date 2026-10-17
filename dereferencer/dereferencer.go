@@ -45,7 +45,8 @@
 //
 // Content types: a DID document is a *document.Document whose
 // representation is dereferencingMetadata.contentType (checked with the
-// producer); a fragment is a vm.Method, a vm.Service or a document.Map whose
+// producer); a fragment is a vm.Method, a vm.Service, a document.Map or a
+// fresh map[string]any when numeric fidelity requires it, whose
 // contentType is application/ld+json for a JSON-LD based representation and
 // application/json for application/did+json; a URI list is a []string with
 // contentType text/uri-list.
