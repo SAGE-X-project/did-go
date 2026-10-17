@@ -22,7 +22,11 @@ type Metadata struct {
 	Created     *time.Time
 	Updated     *time.Time
 	Deactivated bool
-	NextUpdate  *time.Time
+	// DeactivatedPresent preserves an explicitly supplied false value. A true
+	// Deactivated value is always written for compatibility with existing callers.
+	// JSON decoding sets this flag for either boolean; the zero value omits it.
+	DeactivatedPresent bool
+	NextUpdate         *time.Time
 	// VersionID and NextVersionID are ASCII strings.
 	VersionID     string
 	NextVersionID string
@@ -45,7 +49,7 @@ func metadataNames() []string {
 // IsEmpty reports whether m has no property, as required for the metadata
 // of an unsuccessful resolution.
 func (m Metadata) IsEmpty() bool {
-	return m.Created == nil && m.Updated == nil && !m.Deactivated && m.NextUpdate == nil &&
+	return m.Created == nil && m.Updated == nil && !m.Deactivated && !m.DeactivatedPresent && m.NextUpdate == nil &&
 		m.VersionID == "" && m.NextVersionID == "" && len(m.EquivalentID) == 0 &&
 		m.CanonicalID == "" && len(m.Proof) == 0 && len(m.Extra) == 0
 }
@@ -93,8 +97,8 @@ func (m Metadata) MarshalJSON() ([]byte, error) {
 	putTime(out, "created", m.Created)
 	putTime(out, "updated", m.Updated)
 	putTime(out, "nextUpdate", m.NextUpdate)
-	if m.Deactivated {
-		out["deactivated"] = true
+	if m.Deactivated || m.DeactivatedPresent {
+		out["deactivated"] = m.Deactivated
 	}
 	putString(out, "versionId", m.VersionID)
 	putString(out, "nextVersionId", m.NextVersionID)
@@ -151,7 +155,15 @@ func (m *Metadata) decodeMember(k string, v json.RawMessage) error {
 	case "nextUpdate":
 		return decodeTime(v, &m.NextUpdate)
 	case "deactivated":
-		return json.Unmarshal(v, &m.Deactivated)
+		var value *bool
+		if err := json.Unmarshal(v, &value); err != nil {
+			return err
+		}
+		if value == nil {
+			return fmt.Errorf("must be a boolean, not null")
+		}
+		m.Deactivated, m.DeactivatedPresent = *value, true
+		return nil
 	case "versionId":
 		return json.Unmarshal(v, &m.VersionID)
 	case "nextVersionId":
