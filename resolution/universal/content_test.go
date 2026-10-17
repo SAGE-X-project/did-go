@@ -54,7 +54,11 @@ func server(t *testing.T) (*httptest.Server, *universal.Client) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, err := dereferencer.New(r, p)
+	documentResolver, err := resolver.New(reg, consumer.New(), p, resolver.ForDereferencing())
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := dereferencer.New(documentResolver, p)
 	if err != nil {
 		t.Fatal(err)
 	}

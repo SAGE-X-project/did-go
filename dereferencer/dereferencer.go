@@ -31,9 +31,9 @@
 // Choices where the specification leaves room are documented on the
 // functions that make them; the main ones are:
 //
-//   - accept is passed to the resolver only when it accepts a DID document
-//     representation, since the dereferencing accept describes the content,
-//     which for service selection is a URI list no resolver can produce;
+//   - every accept preference is passed unchanged to the resolver. A resolver
+//     used to retrieve intermediate documents can be constructed separately
+//     with resolver.ForDereferencing; the direct resolver remains strict;
 //   - a query made only of versionId and versionTime dereferences to the
 //     resolved (versioned) document, because those parameters are resolution
 //     options;
@@ -93,7 +93,10 @@ func WithResourceHandler(h ResourceHandler) Option {
 }
 
 // New returns a dereferencer that resolves DIDs with r and checks document
-// representations with p. A nil resolver or producer is an error.
+// representations with p. A nil resolver or producer is an error. All options,
+// including accept for final content, reach r unchanged. For service URI lists,
+// construct a dedicated resolver with resolver.ForDereferencing; New does not
+// reconfigure r or retry a failed resolution with different options.
 func New(r resolution.Resolver, p representation.Producer, opts ...Option) (*Dereferencer, error) {
 	if r == nil || p == nil {
 		return nil, errors.New("dereferencer: a resolver and a producer are required")
@@ -164,12 +167,10 @@ func (d *Dereferencer) Dereference(ctx context.Context, u did.DIDURL, opts resol
 // all DID parameters of the input DID URL MUST be passed as resolution
 // options"). versionId and versionTime become the options of the same name;
 // every other parameter, verificationRelationship and the extension options
-// go to Extra under their names. accept is passed only when it accepts a DID
-// document representation: the dereferencing accept describes the content,
-// and for service selection the content is a URI list that no resolver can
-// produce, so passing such a value would fail resolution.
+// go to Extra under their names. accept is always passed unchanged, including
+// a preference for content that is not a DID document representation.
 func resolutionOptions(params did.DIDParameters, opts resolution.DereferenceOptions) resolution.ResolutionOptions {
-	ro := resolution.ResolutionOptions{VersionID: params.VersionID}
+	ro := resolution.ResolutionOptions{VersionID: params.VersionID, Accept: opts.Accept}
 	if _, ok := params.Get(did.ParamVersionTime); ok {
 		t := params.VersionTime
 		ro.VersionTime = &t
@@ -191,9 +192,6 @@ func resolutionOptions(params did.DIDParameters, opts resolution.DereferenceOpti
 		add("verificationRelationship", opts.VerificationRelationship)
 	}
 	ro.Extra = extra
-	if _, ok := resolution.Negotiate(opts.Accept, representation.CoreMediaTypes()); ok && opts.Accept != "" {
-		ro.Accept = opts.Accept
-	}
 	return ro
 }
 

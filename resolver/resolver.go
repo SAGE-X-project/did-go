@@ -34,7 +34,9 @@
 // Every error result has a nil document, empty document metadata and the
 // error in the resolution metadata (resolution.ErrorResult).
 //
-// Representation selection follows docs/12 §6.2: without accept the driver
+// The default direct representation policy follows docs/12 §6.2; the explicit
+// ForDereferencing option selects the separate intermediate-document policy.
+// Without accept the driver
 // bytes are returned unchanged; with accept they are returned when their
 // representation is acceptable, and otherwise the validated document is
 // transcoded with the producer, the driver original kept in Result.Source.
@@ -67,10 +69,11 @@ import (
 // mutable state and is safe for concurrent use when its registry, consumer
 // and producer are.
 type DefaultResolver struct {
-	registry *method.Registry
-	consumer representation.Consumer
-	producer representation.Producer
-	accepted []string
+	registry             *method.Registry
+	consumer             representation.Consumer
+	producer             representation.Producer
+	accepted             []string
+	intermediateDocument bool
 }
 
 var _ resolution.Resolver = (*DefaultResolver)(nil)
@@ -84,6 +87,20 @@ type Option func(*DefaultResolver)
 // FEATURE_NOT_SUPPORTED (DID Resolution §4.4 step 3).
 func AcceptOptions(names ...string) Option {
 	return func(r *DefaultResolver) { r.accepted = append(r.accepted, names...) }
+}
+
+// ForDereferencing configures a dedicated resolver for retrieving intermediate
+// DID documents for a DID URL dereferencer. A valid accept value that matches no
+// supported DID representation is a preference for final content, not a format
+// to invent for the intermediate document. Such a request uses the driver's
+// conforming DID representation instead (DID Resolution CRD 2026-10-01 §4.1,
+// conditional SHOULD, and §5.4.1). Original options are still validated.
+//
+// Keep this instance separate from direct resolution and HTTP resolution
+// endpoints, which must retain their strict representation policy. This option
+// does not relax document validation, other options or driver/producer errors.
+func ForDereferencing() Option {
+	return func(r *DefaultResolver) { r.intermediateDocument = true }
 }
 
 // DefaultAcceptedOptions returns the extension options a DefaultResolver
@@ -136,7 +153,16 @@ func (r *DefaultResolver) Resolve(ctx context.Context, d did.DID, opts resolutio
 	if e := opts.Validate(); e != nil {
 		return resolution.ErrorResult(e)
 	}
-	rr, e := read(ctx, m, d, opts)
+	// Preserve the original validated options at the public Resolve boundary.
+	// Only the dedicated instance's intermediate representation selection has
+	// this fallback; no call is retried and no caller-owned option is changed.
+	documentOptions := opts
+	if r.intermediateDocument {
+		if _, ok := resolution.Negotiate(opts.Accept, representation.CoreMediaTypes()); !ok {
+			documentOptions.Accept = ""
+		}
+	}
+	rr, e := read(ctx, m, d, documentOptions)
 	if e != nil {
 		return resolution.ErrorResult(e)
 	}
@@ -146,7 +172,7 @@ func (r *DefaultResolver) Resolve(ctx context.Context, d did.DID, opts resolutio
 	if rr.Metadata.Deactivated {
 		return resolution.Result{DocumentMetadata: rr.Metadata.Clone()}
 	}
-	return r.output(d, rr, opts)
+	return r.output(d, rr, documentOptions)
 }
 
 // supported is step 3: every extension option must be one the resolver
@@ -160,7 +186,7 @@ func (r *DefaultResolver) supported(opts resolution.ResolutionOptions) *resoluti
 	}
 	if opts.Accept != "" {
 		if _, err := resolution.ParseAccept(opts.Accept); err == nil {
-			if _, ok := resolution.Negotiate(opts.Accept, representation.CoreMediaTypes()); !ok {
+			if _, ok := resolution.Negotiate(opts.Accept, representation.CoreMediaTypes()); !ok && !r.intermediateDocument {
 				return resolution.NewAcceptNotSupported(opts.Accept)
 			}
 		}
