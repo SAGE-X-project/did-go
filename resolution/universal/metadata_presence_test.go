@@ -7,6 +7,7 @@ import (
 
 	"github.com/sage-x-project/did-go/document"
 	"github.com/sage-x-project/did-go/resolution"
+	"github.com/sage-x-project/did-go/spec"
 )
 
 // Two owned TLS hops exercise the actual downstream client and handler, with
@@ -23,7 +24,7 @@ func TestProxiedMetadataPresence(t *testing.T) {
 				t.Fatal(err)
 			}
 			up := &fakeResolver{result: resolution.Result{Raw: []byte(docV11), DocumentMetadata: md,
-				ResolutionMetadata: resolution.ResolutionMetadata{Extra: map[string]any{"source": "owned upstream"}}}}
+				ResolutionMetadata: resolution.ResolutionMetadata{ContentType: spec.MediaTypeDID, Extra: map[string]any{"source": "owned upstream"}}}}
 			if md.Deactivated {
 				up.result.Raw = nil
 			}
