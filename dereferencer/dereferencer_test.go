@@ -42,6 +42,7 @@ func newResolver(t *testing.T, ropts []resolver.Option, ms ...method.Method) *re
 	if err != nil {
 		t.Fatal(err)
 	}
+	ropts = append(ropts, resolver.ForDereferencing())
 	r, err := resolver.New(reg, consumer.New(), producer.New(), ropts...)
 	if err != nil {
 		t.Fatal(err)
@@ -153,11 +154,11 @@ func TestDereferenceResource(t *testing.T) {
 			t.Fatal("the driver reads the requested version")
 		}
 	})
-	t.Run("accept is a resolution option when it accepts a DID document representation", func(t *testing.T) {
+	t.Run("every accept value reaches the nested resolution unchanged", func(t *testing.T) {
 		e := newEnv(t)
 		e.deref(t, testutil.ExampleDID, resolution.DereferenceOptions{Accept: "application/did+json"})
 		e.deref(t, testutil.ExampleDID+"?service=files", resolution.DereferenceOptions{Accept: dereferencer.MediaTypeURIList})
-		if e.spy.calls[0].Accept != "application/did+json" || e.spy.calls[1].Accept != "" {
+		if e.spy.calls[0].Accept != "application/did+json" || e.spy.calls[1].Accept != dereferencer.MediaTypeURIList {
 			t.Fatalf("accept passed: %q %q", e.spy.calls[0].Accept, e.spy.calls[1].Accept)
 		}
 	})

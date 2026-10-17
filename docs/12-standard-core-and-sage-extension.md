@@ -353,6 +353,12 @@ The resolve path works in this order.
    mapping in DIDP-05 of SAGE 0.10.0 chapter 10. In Go it is returned as the
    error made by `resolution.NewAcceptNotSupported`. Its type is
    `FEATURE_NOT_SUPPORTED`, and `IsAcceptNotSupported` recognizes it.
+   This is the default direct-resolution policy. A dedicated intermediate
+   document resolver may instead be explicitly configured with
+   `resolver.ForDereferencing()`; only valid preferences matching no supported
+   DID representation fall back to the actual driver representation. Keep that
+   instance separate from direct and HTTP resolution. The original nested
+   options remain intact (see [dereferencing options](dereferencing-options.md)).
    DID Core 1.0 defines `representationNotSupported` for this case, so the v1.0
    adapter recognizes this error and maps it to `representationNotSupported`
    (`09` §6.1).

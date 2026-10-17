@@ -123,7 +123,10 @@ func (k *Kit) NewResolver(methods ...method.Method) (resolution.Resolver, error)
 }
 
 // NewDereferencer returns a DID URL dereferencer over r with the Kit's
-// producer. A nil resolver is an error.
+// producer. A nil resolver is an error. Options reach r unchanged. For service
+// URI lists, pass a separate resolver built by a Kit configured with
+// WithResolverOptions(resolver.ForDereferencing()). Do not reuse that resolver
+// for strict direct or HTTP resolution.
 func (k *Kit) NewDereferencer(r resolution.Resolver) (*dereferencer.Dereferencer, error) {
 	return dereferencer.New(r, k.producer, k.cfg.dereferencer...)
 }
