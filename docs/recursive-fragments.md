@@ -1,0 +1,13 @@
+# Recursive public fragment search
+
+The dated [Controlled Identifiers 1.0, 15 May 2025, section 3.4](https://www.w3.org/TR/2025/REC-cid-1.0-20250515/#fragment-resolution) requires recursive map traversal, matching either the document URL plus fragment or the fragment identifier, and stopping on the first match.
+
+The dereferencer visits each verification method, each embedded verification method in purpose order, each service, then root extensions. Within each typed item it checks the item first, then its public child maps depth first. Arrays retain their order; Go JSON map keys use the existing wire layer's sorted order. The standard does not specify a tie order for conflicting extension IDs; this traversal defines the library's deterministic first match. Existing typed method and service matches remain typed. A failed search remains NOT_FOUND under this library's existing error policy, not a new CID-required error name.
+
+Public method traversal includes public JWK and additional properties, and service traversal includes endpoint maps and additional properties. Representation entries such as @context are not abstract document entries. Private method material is excluded, consistently with the HTTP fragment writer's existing public projection. This is not a global filter on arbitrary extension property names and does not confer verification-relationship authorization on a matched map.
+
+The traversal uses JSON nodes without first narrowing a whole method or service to the INFRA value model. A large sibling number cannot hide a matching child. A selected map remains document.Map when conversion round-trips exactly. If its numbers cannot round-trip, the result is a fresh map[string]any containing exact json.Number values. The existing HTTP handler supports these maps without a new transport format. This preserves native selection and HTTP bytes; the client's separate low-precision representation conversion is not expanded or certified by this repair.
+
+Unit tests cover direct and relative IDs, all five embedded relationships, method extras and public JWKs, service extras and single/set endpoint maps, extension controls, absence, immutable input, numeric fidelity, private-field exclusion and stop-first behavior. Owned loopback TLS tests exercise the actual resolver, dereferencer, handler and client, and compare wire bytes independently with ordinary, wide-integer and precise-decimal values. No external registry, live agent or attack reproduction is involved.
+
+This change does not repair relative-address expansion or primary-resource URL fragment removal, adopt a new root in SAGE consumers, change SAGE 0.10.0 policies, establish operating authority or replace historical Inspector results.

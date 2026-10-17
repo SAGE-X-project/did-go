@@ -1,10 +1,12 @@
 package dereferencer
 
 import (
+	"bytes"
 	"strings"
 
 	"github.com/sage-x-project/did-go/did"
 	"github.com/sage-x-project/did-go/document"
+	"github.com/sage-x-project/did-go/internal/wire"
 	"github.com/sage-x-project/did-go/resolution"
 	"github.com/sage-x-project/did-go/spec"
 	"github.com/sage-x-project/did-go/vm"
@@ -88,10 +90,14 @@ func verificationMethod(doc *document.Document, frag, rel, docType string) resol
 // fullyQualifiedFragment is that id with "#" and the fragment appended, and
 // every map of the document (verification methods, embedded verification
 // methods, services and maps inside extension properties, in that order) is
-// checked for an id equal to fullyQualifiedFragment or to the fragment
+// checked depth first for an id equal to fullyQualifiedFragment or to the
+// fragment
 // identifier "#" + frag. The first match is returned as a vm.Method, a
-// vm.Service or a document.Map. No match is NOT_FOUND (docs/07 §2.1(b); the
-// specification gives no error type).
+// vm.Service or a document.Map. A JSON map whose numeric values cannot
+// round-trip through document.Value is returned as a plain JSON map without
+// narrowing its numbers. Private method material is excluded from the public
+// fragment traversal, as it is from the HTTP fragment writer. No match is
+// NOT_FOUND (docs/07 §2.1(b); the specification gives no error type).
 func resolveFragment(doc *document.Document, frag, docType string) resolution.DereferenceResult {
 	full, short := doc.ID().String()+"#"+frag, "#"+frag
 	match := func(id string) bool { return id == full || id == short }
@@ -107,14 +113,16 @@ func resolveFragment(doc *document.Document, frag, docType string) resolution.De
 
 func findFragment(doc *document.Document, match func(string) bool) (any, bool) {
 	for _, m := range doc.VerificationMethods() {
-		if match(m.ID.String()) {
-			return m, true
+		if found, ok := findMethodFragment(m, match); ok {
+			return found, true
 		}
 	}
 	for _, p := range vm.Purposes() {
 		for _, r := range doc.Relationship(p) {
-			if m, ok := r.Method(); ok && match(m.ID.String()) {
-				return m, true
+			if m, ok := r.Method(); ok {
+				if found, ok := findMethodFragment(m, match); ok {
+					return found, true
+				}
 			}
 		}
 	}
@@ -122,10 +130,63 @@ func findFragment(doc *document.Document, match func(string) bool) (any, bool) {
 		if match(s.ID) {
 			return s, true
 		}
+		n, err := wire.FromService(s)
+		if err == nil {
+			if found, ok := findJSONFragment(n, match); ok {
+				return found, true
+			}
+		}
 	}
 	for _, e := range doc.Extensions().Entries() {
 		if m, ok := findMap(e.Value, match); ok {
 			return m, true
+		}
+	}
+	return nil, false
+}
+
+// findMethodFragment keeps typed method results and searches every public
+// map held by the method, including JWK and additional properties. Methods
+// come from immutable validated documents; an unwritable value is not searched.
+func findMethodFragment(m vm.Method, match func(string) bool) (any, bool) {
+	if match(m.ID.String()) {
+		return m, true
+	}
+	n, err := wire.FromMethod(m, false)
+	if err != nil {
+		return nil, false
+	}
+	return findJSONFragment(n, match)
+}
+
+// findJSONFragment walks public JSON maps without first narrowing the entire
+// container to the int64/double document.Value model. Unrelated large numbers
+// must not hide a matching child. Sorting is supplied by wire's JSON maps;
+// arrays keep their order. Return immediately on the first matching map.
+func findJSONFragment(n wire.Node, match func(string) bool) (any, bool) {
+	if n.Kind == wire.Object {
+		if id, ok := n.Get("id"); ok && id.Kind == wire.String && match(id.Text) {
+			value, err := wire.ToValue(n)
+			if err == nil {
+				encoded, err := wire.FromValue(value)
+				if err == nil && bytes.Equal(wire.Encode(encoded), wire.Encode(n)) {
+					return value, true
+				}
+			}
+			// ToAny retains exact json.Number text in a fresh, independent map.
+			return wire.ToAny(n), true
+		}
+		for _, member := range n.Members {
+			if found, ok := findJSONFragment(member.Value, match); ok {
+				return found, true
+			}
+		}
+	}
+	if n.Kind == wire.Array {
+		for _, item := range n.Items {
+			if found, ok := findJSONFragment(item, match); ok {
+				return found, true
+			}
 		}
 	}
 	return nil, false
