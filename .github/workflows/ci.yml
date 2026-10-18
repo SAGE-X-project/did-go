@@ -168,3 +168,66 @@ jobs:
             ${{ runner.temp }}/resource-source.sha256
             ${{ runner.temp }}/cover.out
             ${{ runner.temp }}/sage-cover.out
+
+  standalone-sage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GOWORK: 'off'
+      GOTOOLCHAIN: local
+    defaults:
+      run:
+        working-directory: advanced/sage
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: '1.26.8'
+      - name: Verify the public root dependency
+        run: |
+          go mod download
+          go mod verify
+          go list -mod=readonly -m -json all > "$RUNNER_TEMP/standalone-modules.json"
+          go list -mod=readonly -m -json github.com/sage-x-project/did-go > "$RUNNER_TEMP/standalone-root.json"
+          python3 - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          root = json.loads((Path(os.environ['RUNNER_TEMP']) / 'standalone-root.json').read_text())
+          assert root['Path'] == 'github.com/sage-x-project/did-go'
+          assert root['Version'] == 'v0.0.0-20261018080828-3b7a79c1c326'
+          assert root['Sum'] == 'h1:Am4pVUAnGnhje6WZgO19ltbRV1NDCfvmEzQAuwHInM8='
+          assert root['GoModSum'] == 'h1:Xi8PmTFqnTT9F008Q4MvrZc6KFrtcrXBP/e1dH8mFaQ='
+          assert not root.get('Replace') and not root.get('Main')
+          PYTHON
+          go env GOWORK GOTOOLCHAIN > "$RUNNER_TEMP/standalone-environment.txt"
+          test "$(go env GOWORK)" = off
+          test "$(go env GOTOOLCHAIN)" = local
+          go version > "$RUNNER_TEMP/standalone-compiler.txt"
+          git rev-parse HEAD > "$RUNNER_TEMP/standalone-revision.txt"
+          git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/standalone-tree.txt"
+          sha256sum go.mod go.sum standalone_tls_test.go ../../docs/standalone-sage.md ../../.github/workflows/ci.yml > "$RUNNER_TEMP/standalone-source.sha256"
+      - name: Build and check the standalone module
+        run: |
+          test -z "$(gofmt -l .)"
+          go build -mod=readonly ./...
+          go vet -mod=readonly ./...
+          go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./...
+          git diff --exit-code -- go.mod go.sum
+      - name: Test the standalone module and owned TLS boundary
+        run: |
+          go test -mod=readonly -count=1 -race -json -coverprofile="$RUNNER_TEMP/standalone-cover.out" ./... > "$RUNNER_TEMP/standalone-tests.jsonl"
+          go tool cover -func="$RUNNER_TEMP/standalone-cover.out" > "$RUNNER_TEMP/standalone-coverage.txt"
+          awk '/^total:/ {sub(/%$/, "", $3); found=1; if ($3+0 < 90) exit 1} END {if (!found) exit 1}' "$RUNNER_TEMP/standalone-coverage.txt"
+          git diff --exit-code -- go.mod go.sum
+      - name: Upload standalone module evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: standalone-sage
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/standalone-*.json
+            ${{ runner.temp }}/standalone-*.jsonl
+            ${{ runner.temp }}/standalone-*.txt
+            ${{ runner.temp }}/standalone-source.sha256
+            ${{ runner.temp }}/standalone-cover.out
