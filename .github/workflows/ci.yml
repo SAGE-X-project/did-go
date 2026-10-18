@@ -146,3 +146,25 @@ jobs:
             ${{ runner.temp }}/expansion-source.sha256
             ${{ runner.temp }}/cover.out
             ${{ runner.temp }}/sage-cover.out
+
+      - name: Record primary resource URL evidence
+        run: |
+          go test -count=1 -json -run '^TestPrimaryResource' ./dereferencer ./resolution/universal > "$RUNNER_TEMP/resource-tests.jsonl"
+          go tool cover -func="$RUNNER_TEMP/cover.out" > "$RUNNER_TEMP/resource-coverage.txt"
+          awk '($1 ~ /\/dereferencer\/dereferencer.go:/ && $2 == "resource") || ($1 ~ /\/did\/url.go:/ && $2 == "WithoutFragment") {value=$NF; sub(/%$/, "", value); found++; if (value+0 < 90) bad=1} END {if (found != 2 || bad) exit 1}' "$RUNNER_TEMP/resource-coverage.txt"
+          git rev-parse HEAD > "$RUNNER_TEMP/resource-revision.txt"
+          git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/resource-tree.txt"
+          go version > "$RUNNER_TEMP/resource-compiler.txt"
+          sha256sum dereferencer/dereferencer.go dereferencer/primary_resource_test.go resolution/universal/primary_resource_test.go docs/primary-resource-urls.md docs/07-did-resolution-contract.md .github/workflows/ci.yml > "$RUNNER_TEMP/resource-source.sha256"
+      - name: Upload primary resource URL evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: primary-resource-urls
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/resource-*.jsonl
+            ${{ runner.temp }}/resource-*.txt
+            ${{ runner.temp }}/resource-source.sha256
+            ${{ runner.temp }}/cover.out
+            ${{ runner.temp }}/sage-cover.out
