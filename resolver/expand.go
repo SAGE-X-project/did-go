@@ -46,6 +46,10 @@ func expand(d *document.Document) (*document.Document, error) {
 		b.Service() // keep an empty set present
 		for _, s := range ss {
 			s.ID = absoluteString(s.ID, base)
+			s.Extra = expandJSONMap(s.Extra, base)
+			for i := range s.ServiceEndpoint {
+				s.ServiceEndpoint[i].Map = expandJSONMap(s.ServiceEndpoint[i].Map, base)
+			}
 			b.Service(s)
 		}
 	}
@@ -60,6 +64,8 @@ func expand(d *document.Document) (*document.Document, error) {
 
 func expandMethod(m vm.Method, base did.DIDURL) vm.Method {
 	m.ID = absolute(m.ID, base)
+	m.PublicKeyJwk = expandJSONMap(m.PublicKeyJwk, base)
+	m.Extra = expandJSONMap(m.Extra, base)
 	return m
 }
 
@@ -109,4 +115,40 @@ func expandValue(v document.Value, base did.DIDURL) document.Value {
 		return l
 	}
 	return v
+}
+
+// expandJSONMap traverses a public typed map without converting its JSON
+// numbers to document.Value or float64. Only string-valued id properties are
+// resolved. Every map/list is copied; scalar types and values remain intact.
+// Typed secret method fields and representation entries are not public maps.
+func expandJSONMap(input map[string]any, base did.DIDURL) map[string]any {
+	if input == nil {
+		return nil
+	}
+	out := make(map[string]any, len(input))
+	for name, value := range input {
+		if id, ok := value.(string); name == "id" && ok {
+			out[name] = absoluteString(id, base)
+		} else {
+			out[name] = expandJSONValue(value, base)
+		}
+	}
+	return out
+}
+
+func expandJSONValue(value any, base did.DIDURL) any {
+	switch v := value.(type) {
+	case map[string]any:
+		return expandJSONMap(v, base)
+	case []any:
+		if v == nil {
+			return []any(nil)
+		}
+		out := make([]any, len(v))
+		for i, item := range v {
+			out[i] = expandJSONValue(item, base)
+		}
+		return out
+	}
+	return value
 }

@@ -1,0 +1,11 @@
+# Nested relative identifiers
+
+[DID Resolution, 1 October 2026, section 4.4](https://www.w3.org/TR/2026/CRD-did-resolution-1.0-20261001/#resolving-algorithm) requires the enabled expandRelativeUrls branch to traverse services, verification methods, verification relationships and extension-defined properties. Object id strings and relationship references use the existing relative DID URL resolution rules. The existing option guard, top-level typed IDs and root immutable Map/List traversal are retained.
+
+Public method JWK and additional-property maps, embedded methods in all five relationships, service additional properties and every endpoint map are now traversed. Each nested map/list is copied. Only a string-valued id is resolved; labels, endpoint strings, other string properties, non-string IDs, numeric dynamic types and exact json.Number text are preserved. An object/list used as a non-string id still has its own children visited. The new copier preserves nil and empty collection shape at its helper boundary; existing document/accessor normalization is unchanged. Repeating expansion does not change an already expanded result.
+
+Typed secretKeyJwk/secretKeyMultibase fields are outside this public-output traversal and remain untouched. This is not a global filter on extension property names. Representation entries such as @context are preserved separately. This transformation does not authorize a key or establish operational trust.
+
+The existing absoluteString helper retains its URI policy: malformed references, empty IDs and unsupported network-path references are left unchanged. The repair does not introduce arbitrary RFC 3986 resolution support, JSON-LD processing or new error behavior. Unit tests include accepted fragment/path/query references and these unchanged controls. Owned loopback TLS tests use the real resolver, handler and client with both option states and independently compare wire JSON, including wide integers and precise decimals.
+
+Inspector evidence for the unchanged five historical expansion fixtures is kept separate from broader root unit/TLS coverage. Historical reports and SAGE 0.10.0 remain unchanged. SAGE advanced module pins and Go/Rust/ADK consumer adoption, primary-resource URL fragment removal and operating registry authority are separate work.
