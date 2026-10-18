@@ -70,8 +70,9 @@ const MediaTypeURIList = "text/uri-list"
 // ResourceHandler dereferences a DID URL with a path or a query that DID
 // Resolution §5.4.1 leaves to the DID method, an extension or the client
 // ("The applicable DID method MAY specify how to dereference the DID path
-// and/or DID query"). It receives the full DID URL, fragment included, and
-// the resolution result of its DID, and reports whether it handled the URL.
+// and/or DID query"). It receives the primary DID URL without its fragment
+// and the resolution result of its DID. A handled result remains final; the
+// dispatcher does not newly apply fragment processing to handler results.
 type ResourceHandler func(ctx context.Context, u did.DIDURL, resolved resolution.Result, opts resolution.DereferenceOptions) (resolution.DereferenceResult, bool)
 
 // Dereferencer dereferences DID URLs. It has no mutable state and is safe
@@ -88,7 +89,9 @@ var _ resolution.Dereferencer = (*Dereferencer)(nil)
 type Option func(*Dereferencer)
 
 // WithResourceHandler adds a handler for DID URLs with a path or a query.
-// Handlers are tried in the order they were added.
+// Handlers are tried in the order they were added, with a fragment-free
+// primary URL. Callbacks that used Fragment or HasFragment must migrate;
+// returning handled still makes their result final.
 func WithResourceHandler(h ResourceHandler) Option {
 	return func(d *Dereferencer) { d.handlers = append(d.handlers, h) }
 }
@@ -209,7 +212,7 @@ func (d *Dereferencer) resource(ctx context.Context, u did.DIDURL, params did.DI
 		return d.documentResult(res.Document, res, opts, u.HasFragment()), false
 	}
 	for _, h := range d.handlers {
-		if out, ok := h(ctx, u, res, opts); ok {
+		if out, ok := h(ctx, u.WithoutFragment(), res, opts); ok {
 			return out, true
 		}
 	}

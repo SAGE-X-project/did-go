@@ -101,6 +101,9 @@ All inputs and outputs except `contentStream` must be serializable to JSON.
 
 ### 2.1 dereference algorithm (`#dereferencing-algorithm`)
 **(a) Dereferencing the resource (`#dereferencing-algorithm-resource`)**
+
+ResourceHandler receives the fragment-free primary URL. The original URL remains available for existing document/service fragment handling and negotiation deferral. A handled callback result remains final. See [primary resource URLs](primary-resource-urls.md) for the callback migration boundary.
+
 ```
 1. didUrl does not conform to syntax   → INVALID_DID_URL
 2. call resolve(did). Dereferencing options + all DID parameters of the DID URL MUST be passed as resolution options
