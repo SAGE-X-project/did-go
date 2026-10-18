@@ -221,7 +221,7 @@ func TestObserveViewsFailures(t *testing.T) {
 				}
 				return producer.New().Produce(d, o)
 			})
-			var callContext context.Context = ctx
+			callContext := ctx
 			id := r.DID
 			switch mode {
 			case "nil-context":
