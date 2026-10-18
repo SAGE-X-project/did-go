@@ -212,7 +212,7 @@ func TestMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"sage":{"controller":"controller-1","observedAt":1799999000,"observedTime":1800000000,"source":"web-registry-1","state":"active"},"versionId":"7"}`
+	want := `{"deactivated":false,"sage":{"controller":"controller-1","observedAt":1799999000,"observedTime":1800000000,"source":"web-registry-1","state":"active"},"versionId":"7"}`
 	if string(data) != want {
 		t.Errorf("metadata %s", data)
 	}

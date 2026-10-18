@@ -100,7 +100,7 @@ func TestResolveAcceptFollowsDIDResolution(t *testing.T) {
 		}
 	}
 	res, code := r.ResolveWithCode(t.Context(), rec.DID, resolution.ResolutionOptions{Accept: "text/html"})
-	if code != "" || res.ResolutionMetadata.Error == nil || res.ResolutionMetadata.Error.Type != resolution.CodeFeatureNotSupported.TypeURL() {
+	if code != CodeRepresentationUnsupported || res.ResolutionMetadata.Error == nil || res.ResolutionMetadata.Error.Type != resolution.CodeFeatureNotSupported.TypeURL() {
 		t.Errorf("text/html (didp-05-unsupported-accept): %+v %q", res.ResolutionMetadata, code)
 	}
 }
