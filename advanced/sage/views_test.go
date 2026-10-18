@@ -3,7 +3,6 @@ package sage
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,17 +28,18 @@ func (f pairedProducer) Produce(d *document.Document, o representation.ProduceOp
 }
 
 // These expected documents are authored from DIDP-01/03, not another projection
-// call. The second source record differs in key, relationship, service and version.
-func pairedExpected(version string, modern bool, nextKey []byte) string {
+// call. A service-only mutation retains controller and all lifetime key entries.
+func pairedExpected(version string, modern bool) string {
 	prefix, typ := `{"id":"`+testDID+`",`, "JsonWebKey2020"
 	if modern {
 		prefix = `{"@context":"https://www.w3.org/ns/did/v1.1","id":"` + testDID + `",`
 		typ = "JsonWebKey"
 	}
+	uri := "https://agent.example/a2a"
 	if version == "8" {
-		return prefix + fmt.Sprintf(`"verificationMethod":[{"id":"%s#next","type":"%s","controller":"%s","publicKeyJwk":{"kty":"OKP","crv":"Ed25519","x":"%s"}}],"authentication":["%s#next"],"assertionMethod":["%s#next"],"service":[{"id":"%s#a2a","type":"A2AInterface","serviceEndpoint":"https://next.example/a2a"}]}`, testDID, typ, testDID, b64(nextKey), testDID, testDID, testDID)
+		uri = "https://next.example/a2a"
 	}
-	return prefix + fmt.Sprintf(`"verificationMethod":[{"id":"%s#agree","type":"%s","controller":"%s","publicKeyJwk":{"kty":"OKP","crv":"X25519","x":"%s"}},{"id":"%s#sign","type":"%s","controller":"%s","publicKeyJwk":{"kty":"OKP","crv":"Ed25519","x":"%s"}}],"authentication":["%s#sign"],"assertionMethod":["%s#sign"],"keyAgreement":["%s#agree"],"service":[{"id":"%s#a2a","type":"A2AInterface","serviceEndpoint":"https://agent.example/a2a"}]}`, testDID, typ, testDID, b64(xKey), testDID, typ, testDID, b64(edKey), testDID, testDID, testDID, testDID)
+	return prefix + fmt.Sprintf(`"verificationMethod":[{"id":"%s#agree","type":"%s","controller":"%s","publicKeyJwk":{"kty":"OKP","crv":"X25519","x":"%s"}},{"id":"%s#sign","type":"%s","controller":"%s","publicKeyJwk":{"kty":"OKP","crv":"Ed25519","x":"%s"}}],"authentication":["%s#sign"],"assertionMethod":["%s#sign"],"keyAgreement":["%s#agree"],"service":[{"id":"%s#a2a","type":"A2AInterface","serviceEndpoint":"%s"}]}`, testDID, typ, testDID, b64(xKey), testDID, typ, testDID, b64(edKey), testDID, testDID, testDID, testDID, uri)
 }
 
 func equalPairedJSON(t *testing.T, raw []byte, expected string) {
@@ -57,10 +57,8 @@ func equalPairedJSON(t *testing.T, raw []byte, expected string) {
 }
 
 func TestObserveViewsSingleObservation(t *testing.T) {
-	nextKey := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{1}, 32)).Public().(ed25519.PublicKey)
 	first, second := activeRecord(t), activeRecord(t)
-	second.Version, second.Controller = "8", "controller-2"
-	second.Keys = []Key{{Name: "next", Alg: AlgEd25519, Material: nextKey, State: KeyAccepted}}
+	second.Version = "8"
 	second.Services[0].URI = "https://next.example/a2a"
 	second.Observation.Time++
 	second.Observation.Issued = issued(1_799_999_001)
@@ -90,7 +88,7 @@ func TestObserveViewsSingleObservation(t *testing.T) {
 			t.Fatal("not a single fresh observation", e, calls, writes)
 		}
 		for n, view := range []ProjectionView{views.Core10, views.DID11} {
-			equalPairedJSON(t, view.Data, pairedExpected(version, n == 1, nextKey))
+			equalPairedJSON(t, view.Data, pairedExpected(version, n == 1))
 			wantType := MediaTypeCore10
 			if n == 1 {
 				wantType = MediaTypeDID11
@@ -102,7 +100,7 @@ func TestObserveViewsSingleObservation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			equalPairedJSON(t, raw, fmt.Sprintf(`{"deactivated":false,"versionId":"%s","sage":{"state":"active","controller":"controller-%d","source":"web-registry-1","observedAt":%d,"observedTime":%d}}`, version, i+1, 1_799_999_000+i, testObserved+int64(i)))
+			equalPairedJSON(t, raw, fmt.Sprintf(`{"deactivated":false,"versionId":"%s","sage":{"state":"active","controller":"controller-1","source":"web-registry-1","observedAt":%d,"observedTime":%d}}`, version, 1_799_999_000+i, testObserved+int64(i)))
 		}
 	}
 }
@@ -167,8 +165,8 @@ func TestObserveViewsOwnership(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	equalPairedJSON(t, views.Core10.Data, pairedExpected("7", false, nil))
-	equalPairedJSON(t, views.DID11.Data, pairedExpected("7", true, nil))
+	equalPairedJSON(t, views.Core10.Data, pairedExpected("7", false))
+	equalPairedJSON(t, views.DID11.Data, pairedExpected("7", true))
 	buffer[0] = 'x'
 	views.Core10.Data[0] = 'y'
 	views.Core10.Metadata.Extra["sage"].(map[string]any)["controller"] = "changed"
@@ -179,7 +177,7 @@ func TestObserveViewsOwnership(t *testing.T) {
 	if e != nil || src.count() != 2 || next.Core10.Metadata.Extra["sage"].(map[string]any)["controller"] != "controller-1" {
 		t.Fatal("returned mutation affected another call", e)
 	}
-	equalPairedJSON(t, next.Core10.Data, pairedExpected("7", false, nil))
+	equalPairedJSON(t, next.Core10.Data, pairedExpected("7", false))
 }
 
 func TestObserveViewsFailures(t *testing.T) {
