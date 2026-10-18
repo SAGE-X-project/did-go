@@ -247,3 +247,22 @@ jobs:
             ${{ runner.temp }}/standalone-*.txt
             ${{ runner.temp }}/standalone-source.sha256
             ${{ runner.temp }}/standalone-cover.out
+      - name: Record paired view evidence
+        run: |
+          go test -mod=readonly -count=1 -race -json -run '^Test(ObserveViews.*|SnapshotRecordOwnsMutableMembers)$' ./... > "$RUNNER_TEMP/paired-tests.jsonl"
+          go tool cover -func="$RUNNER_TEMP/standalone-cover.out" > "$RUNNER_TEMP/paired-coverage.txt"
+          awk '$1 ~ /\/views.go:/ && ($2 == "ObserveViews" || $2 == "snapshotRecord") {value=$NF; sub(/%$/, "", value); found++; if (value+0 < 90) bad=1} END {if (found != 2 || bad) exit 1}' "$RUNNER_TEMP/paired-coverage.txt"
+          sha256sum views.go views_test.go ../../docs/paired-sage-views.md ../../.github/workflows/ci.yml > "$RUNNER_TEMP/paired-source.sha256"
+      - name: Upload paired view evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: paired-sage-views
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/paired-*.jsonl
+            ${{ runner.temp }}/paired-*.txt
+            ${{ runner.temp }}/paired-source.sha256
+            ${{ runner.temp }}/standalone-*.json
+            ${{ runner.temp }}/standalone-*.txt
+            ${{ runner.temp }}/standalone-cover.out
