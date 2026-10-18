@@ -70,6 +70,12 @@ func (r *Resolver) ResolveWithCode(ctx context.Context, d did.DID, opts resoluti
 	if e := rec.get(); e != nil {
 		return resolution.ErrorResult(e.ResolutionError()), report(ctx, e)
 	}
+	// Only the standard resolver's typed Accept refusal is a SAGE
+	// representation error. Keep that error (and its marker) unchanged;
+	// unsupported extension options and errors of other methods are distinct.
+	if d.Method() == MethodName && res.ResolutionMetadata.Error.IsAcceptNotSupported() {
+		return res, report(ctx, NewError(CodeRepresentationUnsupported, ""))
+	}
 	return res, ""
 }
 

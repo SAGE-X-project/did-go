@@ -219,6 +219,22 @@ jobs:
           go tool cover -func="$RUNNER_TEMP/standalone-cover.out" > "$RUNNER_TEMP/standalone-coverage.txt"
           awk '/^total:/ {sub(/%$/, "", $3); found=1; if ($3+0 < 90) exit 1} END {if (!found) exit 1}' "$RUNNER_TEMP/standalone-coverage.txt"
           git diff --exit-code -- go.mod go.sum
+      - name: Record SAGE response contract evidence
+        run: |
+          go test -mod=readonly -count=1 -race -json -run '^TestSAGE(ResponseMetadata|AcceptDiagnostics|ResponseTLS)$' ./... > "$RUNNER_TEMP/sage-response-tests.jsonl"
+          sha256sum projection.go resolver.go projection_test.go resolver_test.go response_contract_test.go ../../docs/sage-response-fields.md ../../.github/workflows/ci.yml > "$RUNNER_TEMP/sage-response-source.sha256"
+      - name: Upload SAGE response contract evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: sage-response-fields
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/sage-response-tests.jsonl
+            ${{ runner.temp }}/sage-response-source.sha256
+            ${{ runner.temp }}/standalone-*.json
+            ${{ runner.temp }}/standalone-*.txt
+            ${{ runner.temp }}/standalone-cover.out
       - name: Upload standalone module evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9

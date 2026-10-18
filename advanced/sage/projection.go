@@ -155,9 +155,10 @@ func Metadata(r Record) document.Metadata {
 		sage["observedAt"] = r.Observation.BlockHash
 	}
 	return document.Metadata{
-		Deactivated: r.State == StateDeactivated,
-		VersionID:   r.Version,
-		Extra:       map[string]any{"sage": sage},
+		Deactivated:        r.State == StateDeactivated,
+		DeactivatedPresent: true,
+		VersionID:          r.Version,
+		Extra:              map[string]any{"sage": sage},
 	}
 }
 
