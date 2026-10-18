@@ -166,7 +166,11 @@ func TestSAGEResponseTLS(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					defer res.Body.Close()
+					defer func() {
+						if err := res.Body.Close(); err != nil {
+							t.Error(err)
+						}
+					}()
 					var wire map[string]json.RawMessage
 					if json.NewDecoder(res.Body).Decode(&wire) != nil {
 						t.Fatal("invalid response JSON")
