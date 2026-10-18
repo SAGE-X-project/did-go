@@ -47,7 +47,10 @@ Neither successful projection nor the pair grants message authority or proves a
 configured deployment's trust policy.
 
 Tests use a changing normal source with complete independently authored document
-expectations, exact production options, reusable producer storage, independent
+expectations. Its active version 7 to 8 transition updates only the service URI;
+the controller and every lifetime key entry remain unchanged under chapter 09.
+It does not simulate controller transfer or removal of a retained key. Additional
+tests cover exact production options, reusable producer storage, independent
 metadata ownership, state/expiry controls and failure/cancellation boundaries.
 The complete existing module/standalone race, coverage and owned TLS tests also
 run. CI retains focused JSON events, per-function coverage, compiler, public root
